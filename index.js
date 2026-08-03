@@ -1,4 +1,5 @@
-import { getUserAvatars } from '../../../personas.js';
+import { getUserAvatars, setUserAvatar } from '../../../personas.js';
+import { power_user } from '../../../power-user.js';
 
 const EXTENSION_NAME = 'MistraelSL Persona Panel';
 const PANEL_SELECTOR = '#PersonaManagement';
@@ -7,6 +8,7 @@ const GLOBAL_SECTION_KEY = 'mistraelsl-persona-panel:global-expanded';
 const EDITOR_SECTION_KEY = 'mistraelsl-persona-panel:editor-expanded-v3';
 const DENSITY_KEY = 'MistraelSL_PersonaPanel_density';
 const MOBILE_COLUMNS_KEY = 'MistraelSL_PersonaPanel_mobileColumns';
+const FAVORITES_KEY = 'MistraelSL_PersonaPanel_favorites';
 
 const DEFAULT_APPEARANCE = Object.freeze({
     theme: 'native',
@@ -37,6 +39,14 @@ const THEMES = Object.freeze({
     nord: {
         accent: '#88c0d0', tint: '#18212b', text: '#e5e9f0', muted: '#9aa8b9',
         border: '#445267', positive: '#8fbc8f', warning: '#ebcb8b', danger: '#bf616a',
+    },
+    emerald: {
+        accent: '#70d6ad', tint: '#12211d', text: '#e9f8f2', muted: '#98b6aa',
+        border: 'rgba(112, 214, 173, 0.3)', positive: '#70d6ad', warning: '#e3ba71', danger: '#e77d88',
+    },
+    crimson: {
+        accent: '#e58a98', tint: '#251418', text: '#fff0f2', muted: '#bea0a6',
+        border: 'rgba(229, 138, 152, 0.32)', positive: '#7dd1a5', warning: '#e5b86d', danger: '#ff7185',
     },
 });
 
@@ -82,6 +92,13 @@ const I18N = {
         compactGrid: 'Compact grid',
         mobileColumns: 'Personas per row',
         backToLibrary: 'Back to persona library',
+        emerald: 'Emerald',
+        crimson: 'Crimson',
+        favorite: 'Add to favorites',
+        unfavorite: 'Remove from favorites',
+        editPersona: 'Edit persona',
+        deletePersona: 'Delete persona',
+        exportPersona: 'Export persona JSON',
     },
     ru: {
         title: 'Панель персон',
@@ -124,6 +141,13 @@ const I18N = {
         compactGrid: 'Компактная сетка',
         mobileColumns: 'Персон в строке',
         backToLibrary: 'Назад к библиотеке персон',
+        emerald: 'Изумрудная',
+        crimson: 'Багровая',
+        favorite: 'Добавить в избранное',
+        unfavorite: 'Убрать из избранного',
+        editPersona: 'Редактировать персону',
+        deletePersona: 'Удалить персону',
+        exportPersona: 'Экспортировать персону в JSON',
     },
 };
 
@@ -163,6 +187,21 @@ function createElement(tag, className = '', text) {
     if (className) element.className = className;
     if (text !== undefined) element.textContent = text;
     return element;
+}
+
+function loadFavorites() {
+    try {
+        const value = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+        return new Set(Array.isArray(value) ? value : []);
+    } catch {
+        return new Set();
+    }
+}
+
+const favoritePersonas = loadFavorites();
+
+function saveFavorites() {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoritePersonas]));
 }
 
 function createIconButton(icon, label, className = '') {
@@ -278,7 +317,10 @@ function createAppearancePanel(panel, settingsButton) {
     themeCopy.append(createElement('strong', '', t('theme')), createElement('small', '', t('themeHint')));
     const themeGrid = createElement('div', 'mpp-theme-grid');
     themeGrid.setAttribute('role', 'radiogroup');
-    const themeLabels = { native: 'native', imperial: 'imperial', amethyst: 'amethyst', nord: 'nord', custom: 'custom' };
+    const themeLabels = {
+        native: 'native', imperial: 'imperial', amethyst: 'amethyst', nord: 'nord',
+        emerald: 'emerald', crimson: 'crimson', custom: 'custom',
+    };
 
     const refreshThemes = () => {
         themeGrid.querySelectorAll('[data-mpp-theme-choice]').forEach(button => {
@@ -570,6 +612,107 @@ function makeGlobalSettingsCollapsible(section) {
     render();
 }
 
+function getCardAvatarId(card) {
+    return card.dataset.avatarId
+        || card.querySelector('.avatar[data-avatar-id]')?.dataset.avatarId
+        || '';
+}
+
+function sanitizeFileName(value) {
+    const clean = String(value || 'persona')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+        .replace(/[. ]+$/g, '')
+        .trim();
+    return clean || 'persona';
+}
+
+function exportPersonaJson(avatarId) {
+    const personaName = power_user.personas?.[avatarId];
+    if (!avatarId || personaName === undefined) return;
+
+    const data = {
+        personas: { [avatarId]: personaName },
+        persona_descriptions: {
+            [avatarId]: power_user.persona_descriptions?.[avatarId] ?? {
+                description: '',
+                connections: [],
+            },
+        },
+        default_persona: power_user.default_persona === avatarId ? avatarId : null,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${sanitizeFileName(personaName)}.persona.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function createCardAction(icon, label, className, handler) {
+    const button = createElement('button', `mpp-card-action ${className}`);
+    button.type = 'button';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.appendChild(createElement('i', `fa-solid ${icon}`));
+    button.addEventListener('click', async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        await handler(button);
+    });
+    button.addEventListener('keydown', event => event.stopPropagation());
+    return button;
+}
+
+function ensureCardActions(card) {
+    const avatarId = getCardAvatarId(card);
+    if (!avatarId) return;
+
+    let actions = card.querySelector(':scope > .mpp-card-actions');
+    if (!actions) {
+        actions = createElement('span', 'mpp-card-actions');
+        const favorite = createCardAction('fa-star', t('favorite'), 'mpp-action-favorite', button => {
+            if (favoritePersonas.has(avatarId)) favoritePersonas.delete(avatarId);
+            else favoritePersonas.add(avatarId);
+            saveFavorites();
+            updateCardActions(card);
+        });
+        const edit = createCardAction('fa-pen-to-square', t('editPersona'), 'mpp-action-edit', async () => {
+            const panel = card.closest(PANEL_SELECTOR);
+            await setUserAvatar(avatarId, { toastPersonaNameChange: false });
+            if (panel?.classList.contains('mpp-editor-collapsed')) panel.querySelector('.mpp-editor-button')?.click();
+            panel?.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        const remove = createCardAction('fa-trash', t('deletePersona'), 'mpp-action-delete', async () => {
+            const panel = card.closest(PANEL_SELECTOR);
+            await setUserAvatar(avatarId, { toastPersonaNameChange: false });
+            panel?.querySelector('#persona_delete_button')?.click();
+        });
+        const exportButton = createCardAction('fa-file-export', t('exportPersona'), 'mpp-action-export', () => {
+            exportPersonaJson(avatarId);
+        });
+        actions.append(favorite, edit, remove, exportButton);
+        card.appendChild(actions);
+    }
+
+    updateCardActions(card);
+}
+
+function updateCardActions(card) {
+    const avatarId = getCardAvatarId(card);
+    const favorite = card.querySelector(':scope > .mpp-card-actions .mpp-action-favorite');
+    const isFavorite = favoritePersonas.has(avatarId);
+    card.classList.toggle('mpp-is-favorite', isFavorite);
+    if (!favorite) return;
+    const label = t(isFavorite ? 'unfavorite' : 'favorite');
+    favorite.classList.toggle('is-active', isFavorite);
+    favorite.title = label;
+    favorite.setAttribute('aria-label', label);
+    favorite.setAttribute('aria-pressed', String(isFavorite));
+}
+
 function updateCardBadges(card) {
     let badges = card.querySelector(':scope > .mpp-card-badges');
     if (!badges) {
@@ -607,12 +750,14 @@ function decorateCards(avatarBlock) {
         if (card.dataset.mppKeyboard !== 'true') {
             card.dataset.mppKeyboard = 'true';
             card.addEventListener('keydown', event => {
+                if (event.target !== card) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     card.click();
                 }
             });
         }
+        ensureCardActions(card);
         updateCardBadges(card);
     });
 }

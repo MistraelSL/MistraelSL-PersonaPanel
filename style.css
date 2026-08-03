@@ -352,7 +352,7 @@
 
 .mpp-theme-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
     gap: 7px;
 }
 
@@ -692,7 +692,7 @@
     min-height: 0;
     max-height: none;
     padding: 2px 3px 3px 2px;
-    grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     align-content: start;
     gap: 12px;
     overflow-x: hidden;
@@ -701,35 +701,37 @@
 }
 
 #PersonaManagement.mpp-panel #user_avatar_block.gridView {
-    grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'],
 #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'] {
-    grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(242px, 1fr));
     gap: 8px;
 }
 
 #PersonaManagement.mpp-panel .mpp-persona-card {
     position: relative;
-    display: flex !important;
+    display: grid !important;
     width: 100% !important;
     min-width: 0;
-    min-height: 0;
+    min-height: 156px;
+    height: 156px;
     margin: 0 !important;
     padding: 5px;
-    flex-direction: column;
+    grid-template-columns: 106px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
     align-items: stretch;
-    gap: 6px;
+    gap: 4px 8px;
     overflow: hidden;
     color: var(--mpp-text);
     border: 0;
-    border-radius: 28px 28px 16px 16px;
+    border-radius: 25px;
     background: color-mix(in srgb, var(--mpp-tint) 76%, transparent);
     cursor: pointer;
     filter: none;
     content-visibility: auto;
-    contain-intrinsic-size: 110px 180px;
+    contain-intrinsic-size: 300px 156px;
     contain: layout paint;
     transition: transform 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
@@ -754,18 +756,19 @@
 
 #PersonaManagement.mpp-panel .mpp-persona-card .avatar {
     display: block !important;
-    flex: none !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    height: auto !important;
+    width: 106px !important;
+    min-width: 106px !important;
+    max-width: 106px !important;
+    height: 146px !important;
     min-height: 0 !important;
-    max-height: none !important;
-    aspect-ratio: 0.72 !important;
+    max-height: 146px !important;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    aspect-ratio: auto !important;
     margin: 0 !important;
     overflow: hidden;
     border: 1px solid var(--mpp-border);
-    border-radius: 25px 25px 13px 13px !important;
+    border-radius: 21px !important;
     outline: none;
     background: var(--mpp-tint);
 }
@@ -792,9 +795,13 @@
     display: flex;
     width: 100% !important;
     min-width: 0;
+    padding: 12px 10px 0 2px;
+    grid-column: 2;
+    grid-row: 1;
     flex-direction: column;
-    align-items: center;
-    gap: 2px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 4px;
 }
 
 #PersonaManagement.mpp-panel .mpp-persona-card .character_name_block {
@@ -802,8 +809,8 @@
     width: 100%;
     min-width: 0;
     flex-direction: column;
-    align-items: center;
-    gap: 1px;
+    align-items: flex-start;
+    gap: 3px;
 }
 
 #PersonaManagement.mpp-panel .mpp-persona-card .ch_name,
@@ -812,7 +819,7 @@
     display: block;
     width: 100%;
     overflow: hidden;
-    text-align: center;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -821,6 +828,7 @@
     color: var(--mpp-text);
     font-size: calc(var(--mainFontSize, 1rem) * 0.92 + var(--mpp-font-adjust));
     font-weight: 700;
+    line-height: 1.2;
 }
 
 #PersonaManagement.mpp-panel .mpp-persona-card .ch_additional_info {
@@ -835,12 +843,24 @@
 
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card {
     padding: 3px;
+    min-height: 116px;
+    height: 116px;
+    grid-template-columns: 80px minmax(0, 1fr);
     border-radius: 14px;
 }
 
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .avatar {
-    aspect-ratio: 1 / 1 !important;
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
+    height: 110px !important;
+    max-height: 110px !important;
+    aspect-ratio: auto !important;
     border-radius: 12px !important;
+}
+
+#PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .character_select_container {
+    padding: 8px 7px 0 1px;
 }
 
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .ch_description {
@@ -849,15 +869,72 @@
 
 #PersonaManagement.mpp-panel .mpp-persona-card .avatar_container_states { display: none !important; }
 
+#PersonaManagement.mpp-panel #user_avatar_block > .mpp-persona-card.mpp-filter-hidden {
+    display: none !important;
+}
+
+.mpp-card-actions {
+    display: flex;
+    min-width: 0;
+    padding: 0 8px 8px 2px;
+    grid-column: 2;
+    grid-row: 2;
+    align-items: center;
+    gap: 5px;
+}
+
+.mpp-card-action {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--mpp-muted);
+    font-size: calc(0.72rem + var(--mpp-font-adjust));
+    border: 1px solid var(--mpp-border);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--mpp-tint) 82%, rgba(255, 255, 255, 0.08));
+    cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+
+.mpp-card-action:hover {
+    color: var(--mpp-text);
+    border-color: color-mix(in srgb, var(--mpp-accent) 62%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 18%, var(--mpp-tint));
+    transform: translateY(-1px);
+}
+
+.mpp-card-action:focus-visible { outline: 2px solid var(--mpp-accent); outline-offset: 1px; }
+.mpp-card-action.mpp-action-favorite.is-active { color: var(--mpp-warning); border-color: var(--mpp-warning); }
+.mpp-card-action.mpp-action-delete:hover { color: var(--mpp-danger); border-color: var(--mpp-danger); }
+
+#PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-actions {
+    padding: 0 5px 5px 1px;
+    gap: 4px;
+}
+
+#PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-action {
+    width: 29px;
+    height: 29px;
+    min-width: 29px;
+    min-height: 29px;
+    border-radius: 9px;
+}
+
 .mpp-card-badges {
     position: absolute;
     z-index: 2;
     top: 11px;
-    right: 11px;
+    left: 11px;
+    right: auto;
     display: flex;
     max-width: calc(100% - 22px);
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 3px;
     pointer-events: none;
 }
@@ -943,6 +1020,10 @@
     text-shadow: none !important;
 }
 
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] * {
+    text-shadow: none !important;
+}
+
 #PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
     .mpp-title-row h2, .mpp-library-header h3, .mpp-spotlight-copy strong,
     .mpp-persona-card .ch_name, .mpp-setting-label, .mpp-appearance-copy strong,
@@ -955,7 +1036,7 @@
 ) { color: var(--mpp-muted) !important; text-shadow: none !important; }
 
 #PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
-    .mpp-native-actions .menu_button, .mpp-button, .mpp-filter,
+    .mpp-native-actions .menu_button, .mpp-button, .mpp-filter, .mpp-card-action,
     .mpp-library-toolbar .menu_button, .mpp-library-toolbar input, .mpp-library-toolbar select,
     .mpp-editor-column .menu_button, .mpp-editor-column .text_pole,
     .mpp-editor-column select, .mpp-editor-column textarea
@@ -965,6 +1046,43 @@
     background-color: var(--mpp-surface) !important;
     filter: none !important;
     text-shadow: none !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(input, select, textarea, button) {
+    font-family: inherit !important;
+    text-transform: none !important;
+    text-decoration: none !important;
+    filter: none !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-theme-swatch {
+    color: var(--mpp-swatch-text, var(--mpp-text)) !important;
+    border-color: var(--mpp-border) !important;
+    background: color-mix(in srgb, var(--mpp-swatch-tint, var(--mpp-tint)) 78%, transparent) !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-theme-swatch:is(:hover, .is-active) {
+    border-color: var(--mpp-swatch-accent, var(--mpp-accent)) !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-theme-preview {
+    background: var(--mpp-swatch-tint, var(--mpp-glass)) !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-filter.is-active {
+    color: color-mix(in srgb, var(--mpp-accent) 76%, var(--mpp-text)) !important;
+    border-color: var(--mpp-accent) !important;
+    background: color-mix(in srgb, var(--mpp-accent) 15%, transparent) !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-card-action.mpp-action-favorite.is-active {
+    color: var(--mpp-warning) !important;
+    border-color: var(--mpp-warning) !important;
+}
+
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-card-action.mpp-action-delete:hover {
+    color: var(--mpp-danger) !important;
+    border-color: var(--mpp-danger) !important;
 }
 
 #PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(.mpp-library-column, .mpp-editor-column, .mpp-appearance) {
@@ -1016,11 +1134,52 @@
     .mpp-library-column { min-height: 0; padding: 0; }
     .mpp-mobile-density { display: flex; }
     #PersonaManagement.mpp-panel #user_avatar_block,
-    #PersonaManagement.mpp-panel #user_avatar_block.gridView { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-mobile-columns='2'],
-    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-mobile-columns='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-mobile-columns='4'],
-    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-mobile-columns='4'] { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+    #PersonaManagement.mpp-panel #user_avatar_block.gridView { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'],
+    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'] { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'][data-mpp-mobile-columns='2'],
+    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'][data-mpp-mobile-columns='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'][data-mpp-mobile-columns='4'],
+    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'][data-mpp-mobile-columns='4'] { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card {
+        display: flex !important;
+        height: auto;
+        min-height: 0;
+        padding: 3px;
+        flex-direction: column;
+        gap: 4px;
+        border-radius: 15px;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .avatar {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        aspect-ratio: 1 / 1 !important;
+        border-radius: 12px !important;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .character_select_container {
+        width: 100% !important;
+        padding: 2px 3px 0;
+        align-items: center;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .character_name_block { align-items: center; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card :is(.ch_name, .ch_additional_info, .ch_description) { text-align: center; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-actions {
+        display: grid;
+        width: 100%;
+        padding: 0 2px 2px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 3px;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-action {
+        width: 100%;
+        min-width: 0;
+        height: 27px;
+        min-height: 27px;
+        border-radius: 8px;
+    }
     .mpp-badge span { display: none; }
     .mpp-badge { width: 20px; padding: 0; justify-content: center; }
 }
@@ -1074,4 +1233,9 @@ body.no-blur #PersonaManagement.mpp-panel .mpp-badge {
 
 @supports not (backdrop-filter: blur(1px)) {
     #PersonaManagement.mpp-panel { background-color: var(--mpp-tint); }
+}
+
+/* Must stay last: density and device rules must never reveal filtered cards. */
+#PersonaManagement.mpp-panel #user_avatar_block > .mpp-persona-card.mpp-filter-hidden {
+    display: none !important;
 }
