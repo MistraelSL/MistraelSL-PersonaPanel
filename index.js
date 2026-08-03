@@ -4,7 +4,9 @@ const EXTENSION_NAME = 'MistraelSL Persona Panel';
 const PANEL_SELECTOR = '#PersonaManagement';
 const STORAGE_KEY = 'mistraelsl-persona-panel:appearance';
 const GLOBAL_SECTION_KEY = 'mistraelsl-persona-panel:global-expanded';
-const EDITOR_SECTION_KEY = 'mistraelsl-persona-panel:editor-expanded';
+const EDITOR_SECTION_KEY = 'mistraelsl-persona-panel:editor-expanded-v3';
+const DENSITY_KEY = 'MistraelSL_PersonaPanel_density';
+const MOBILE_COLUMNS_KEY = 'MistraelSL_PersonaPanel_mobileColumns';
 
 const DEFAULT_APPEARANCE = Object.freeze({
     theme: 'native',
@@ -76,6 +78,10 @@ const I18N = {
         showEditor: 'Show persona editor',
         hideEditor: 'Hide persona editor',
         closePanel: 'Close persona panel',
+        portraitShelf: 'Portrait pills',
+        compactGrid: 'Compact grid',
+        mobileColumns: 'Personas per row',
+        backToLibrary: 'Back to persona library',
     },
     ru: {
         title: 'Панель персон',
@@ -114,6 +120,10 @@ const I18N = {
         showEditor: 'Показать редактор персоны',
         hideEditor: 'Скрыть редактор персоны',
         closePanel: 'Закрыть панель персон',
+        portraitShelf: 'Портретные пилюли',
+        compactGrid: 'Компактная сетка',
+        mobileColumns: 'Персон в строке',
+        backToLibrary: 'Назад к библиотеке персон',
     },
 };
 
@@ -483,6 +493,53 @@ function createFilterBar(avatarBlock) {
     return { bar, apply };
 }
 
+function createDensityControls(avatarBlock) {
+    const state = {
+        density: localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'shelf',
+        mobileColumns: Math.min(4, Math.max(2, Number(localStorage.getItem(MOBILE_COLUMNS_KEY)) || 3)),
+    };
+    const controls = createElement('div', 'mpp-density');
+    const shelf = createIconButton('fa-table-cells-large', t('portraitShelf'), 'mpp-density-button');
+    const compact = createIconButton('fa-grip', t('compactGrid'), 'mpp-density-button');
+    const mobile = createElement('div', 'mpp-mobile-density');
+    mobile.title = t('mobileColumns');
+
+    const apply = () => {
+        avatarBlock.dataset.mppDensity = state.density;
+        avatarBlock.dataset.mppMobileColumns = String(state.mobileColumns);
+        shelf.classList.toggle('is-active', state.density === 'shelf');
+        compact.classList.toggle('is-active', state.density === 'compact');
+        mobile.querySelectorAll('button').forEach(button => {
+            button.classList.toggle('is-active', Number(button.textContent) === state.mobileColumns);
+        });
+    };
+
+    shelf.addEventListener('click', () => {
+        state.density = 'shelf';
+        localStorage.setItem(DENSITY_KEY, state.density);
+        apply();
+    });
+    compact.addEventListener('click', () => {
+        state.density = 'compact';
+        localStorage.setItem(DENSITY_KEY, state.density);
+        apply();
+    });
+    [2, 3, 4].forEach(columns => {
+        const button = createElement('button', '', String(columns));
+        button.type = 'button';
+        button.title = `${t('mobileColumns')}: ${columns}`;
+        button.addEventListener('click', () => {
+            state.mobileColumns = columns;
+            localStorage.setItem(MOBILE_COLUMNS_KEY, String(columns));
+            apply();
+        });
+        mobile.appendChild(button);
+    });
+    controls.append(shelf, compact, mobile);
+    apply();
+    return controls;
+}
+
 function makeGlobalSettingsCollapsible(section) {
     if (!section || section.dataset.mppCollapsible === 'true') return;
     section.dataset.mppCollapsible = 'true';
@@ -600,14 +657,24 @@ function enhancePanel(panel) {
     const nativeToolbar = leftColumn.firstElementChild;
     nativeToolbar?.classList.add('mpp-library-toolbar');
     const libraryHeader = createElement('header', 'mpp-library-header');
+    const libraryCopy = createElement('span', 'mpp-library-copy');
     const libraryTitle = createElement('h3', '', t('library'));
     const personaCounter = createElement('span', 'mpp-persona-counter', t('loading'));
-    libraryHeader.append(libraryTitle, personaCounter);
+    libraryCopy.append(libraryTitle, personaCounter);
+    const densityControls = createDensityControls(avatarBlock);
+    libraryHeader.append(libraryCopy, densityControls);
     leftColumn.prepend(libraryHeader);
     const { bar: filters, apply: applyFilter } = createFilterBar(avatarBlock);
     nativeToolbar?.after(filters);
 
-    let editorExpanded = localStorage.getItem(EDITOR_SECTION_KEY) !== 'false';
+    const editorHead = createElement('header', 'mpp-editor-head');
+    const editorBack = createElement('button', 'mpp-button mpp-editor-back');
+    editorBack.type = 'button';
+    editorBack.append(createElement('i', 'fa-solid fa-arrow-left'), createElement('span', '', t('backToLibrary')));
+    editorHead.appendChild(editorBack);
+    rightColumn.prepend(editorHead);
+
+    let editorExpanded = localStorage.getItem(EDITOR_SECTION_KEY) === 'true';
     const renderEditorState = () => {
         panel.classList.toggle('mpp-editor-collapsed', !editorExpanded);
         editorButton.classList.toggle('is-active', editorExpanded);
@@ -619,6 +686,9 @@ function enhancePanel(panel) {
         editorExpanded = !editorExpanded;
         localStorage.setItem(EDITOR_SECTION_KEY, String(editorExpanded));
         renderEditorState();
+    });
+    editorBack.addEventListener('click', () => {
+        if (editorExpanded) editorButton.click();
     });
     renderEditorState();
 
