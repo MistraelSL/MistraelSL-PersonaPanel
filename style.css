@@ -76,6 +76,9 @@
     min-height: 0;
     padding: 14px;
     flex-direction: column;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
     gap: 10px;
     overflow: hidden;
 }
@@ -418,6 +421,8 @@
     display: grid !important;
     flex: 1 1 auto;
     min-height: 0;
+    width: 100%;
+    flex-wrap: nowrap !important;
     grid-template-columns: minmax(270px, 0.88fr) minmax(320px, 1.12fr);
     align-items: stretch !important;
     gap: 10px !important;
