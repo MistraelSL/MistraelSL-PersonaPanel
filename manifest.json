@@ -1,0 +1,14 @@
+{
+    "name": "MistraelSL-PersonaPanel",
+    "display_name": "🐺 MistraelSL Persona Panel",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "MistraelSL",
+    "version": "0.1.0",
+    "license": "MIT",
+    "homePage": "https://github.com/MistraelSL/MistraelSL-PersonaPanel",
+    "auto_update": true
+}

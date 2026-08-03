@@ -1,0 +1,546 @@
+import { getUserAvatars } from '../../../personas.js';
+
+const EXTENSION_NAME = 'MistraelSL Persona Panel';
+const PANEL_SELECTOR = '#PersonaManagement';
+const STORAGE_KEY = 'mistraelsl-persona-panel:appearance';
+const GLOBAL_SECTION_KEY = 'mistraelsl-persona-panel:global-expanded';
+
+const DEFAULT_APPEARANCE = Object.freeze({
+    theme: 'native',
+    customColor: '#a78bfa',
+    glassOpacity: 86,
+    fontScale: 100,
+});
+
+const THEMES = Object.freeze({
+    native: {
+        accent: 'var(--SmartThemeQuoteColor, #a78bfa)',
+        tint: 'var(--SmartThemeBlurTintColor, #171522)',
+        text: 'var(--SmartThemeBodyColor, #f5f2ff)',
+        muted: 'color-mix(in srgb, var(--SmartThemeBodyColor, #f5f2ff) 60%, transparent)',
+        border: 'color-mix(in srgb, var(--SmartThemeBorderColor, #ffffff) 58%, transparent)',
+        positive: '#73d9ad',
+        warning: '#e8bd72',
+        danger: '#ff7587',
+    },
+    imperial: {
+        accent: '#d7b978', tint: '#211b14', text: '#f6ecd9', muted: '#b9aa93',
+        border: 'rgba(215, 185, 120, 0.34)', positive: '#7bd3a4', warning: '#e7b965', danger: '#e47a7a',
+    },
+    amethyst: {
+        accent: '#ad8bff', tint: '#191426', text: '#f5f0ff', muted: '#aea2c4',
+        border: 'rgba(173, 139, 255, 0.32)', positive: '#75d6ad', warning: '#e8ba70', danger: '#ed7f91',
+    },
+    nord: {
+        accent: '#88c0d0', tint: '#18212b', text: '#e5e9f0', muted: '#9aa8b9',
+        border: '#445267', positive: '#8fbc8f', warning: '#ebcb8b', danger: '#bf616a',
+    },
+});
+
+const I18N = {
+    en: {
+        title: 'Persona Panel',
+        subtitle: 'Your personas, naturally inside SillyTavern',
+        library: 'Persona library',
+        personaOne: 'persona',
+        personaFew: 'personas',
+        personaMany: 'personas',
+        active: 'Active',
+        default: 'Default',
+        chat: 'Chat',
+        character: 'Character',
+        appearance: 'Appearance',
+        appearanceHint: 'These settings affect only Persona Panel.',
+        theme: 'Color scheme',
+        themeHint: 'SillyTavern follows the app theme. Other schemes are independent.',
+        native: 'SillyTavern',
+        imperial: 'Imperial',
+        amethyst: 'Amethyst',
+        nord: 'Nord',
+        custom: 'Custom',
+        customColor: 'Custom accent color',
+        glass: 'Glass visibility',
+        font: 'Text size',
+        reset: 'Reset appearance',
+        close: 'Close appearance settings',
+        expand: 'Expand section',
+        collapse: 'Collapse section',
+        loading: 'Loading…',
+    },
+    ru: {
+        title: 'Панель персон',
+        subtitle: 'Ваши персоны — естественная часть SillyTavern',
+        library: 'Библиотека персон',
+        personaOne: 'персона',
+        personaFew: 'персоны',
+        personaMany: 'персон',
+        active: 'Активна',
+        default: 'По умолчанию',
+        chat: 'Чат',
+        character: 'Персонаж',
+        appearance: 'Внешний вид',
+        appearanceHint: 'Эти настройки меняют только Persona Panel.',
+        theme: 'Цветовая схема',
+        themeHint: 'SillyTavern наследует тему приложения. Остальные схемы независимы.',
+        native: 'SillyTavern',
+        imperial: 'Имперская',
+        amethyst: 'Аметист',
+        nord: 'Нордическая',
+        custom: 'Свой цвет',
+        customColor: 'Свой цвет акцента',
+        glass: 'Видимость стекла',
+        font: 'Размер текста',
+        reset: 'Сбросить оформление',
+        close: 'Закрыть настройки внешнего вида',
+        expand: 'Развернуть раздел',
+        collapse: 'Свернуть раздел',
+        loading: 'Загрузка…',
+    },
+};
+
+function getLanguage() {
+    const context = globalThis.SillyTavern?.getContext?.();
+    const candidates = [
+        context?.getCurrentLocale?.(),
+        context?.locale,
+        context?.language,
+        document.documentElement.lang,
+        navigator.language,
+    ];
+    const selected = candidates.find(value => String(value || '').trim());
+    return String(selected || '').toLowerCase().startsWith('ru') ? 'ru' : 'en';
+}
+
+function t(key) {
+    return I18N[getLanguage()]?.[key] ?? I18N.en[key] ?? key;
+}
+
+function formatPersonaCount(count) {
+    if (getLanguage() !== 'ru') return `${count} ${count === 1 ? t('personaOne') : t('personaMany')}`;
+    const lastTwo = count % 100;
+    const last = count % 10;
+    const form = lastTwo >= 11 && lastTwo <= 14
+        ? 'personaMany'
+        : last === 1
+            ? 'personaOne'
+            : last >= 2 && last <= 4
+                ? 'personaFew'
+                : 'personaMany';
+    return `${count} ${t(form)}`;
+}
+
+function createElement(tag, className = '', text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = text;
+    return element;
+}
+
+function createIconButton(icon, label, className = '') {
+    const button = createElement('button', `mpp-button ${className}`.trim());
+    button.type = 'button';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    const iconElement = createElement('i', `fa-solid ${icon}`);
+    iconElement.setAttribute('aria-hidden', 'true');
+    button.appendChild(iconElement);
+    return button;
+}
+
+function clampNumber(value, minimum, maximum, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(maximum, Math.max(minimum, number)) : fallback;
+}
+
+function normalizeColor(value) {
+    const color = String(value || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : DEFAULT_APPEARANCE.customColor;
+}
+
+function getAppearance() {
+    let stored = {};
+    try {
+        stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    } catch {
+        stored = {};
+    }
+
+    const validThemes = [...Object.keys(THEMES), 'custom'];
+    return {
+        theme: validThemes.includes(stored.theme) ? stored.theme : DEFAULT_APPEARANCE.theme,
+        customColor: normalizeColor(stored.customColor),
+        glassOpacity: clampNumber(stored.glassOpacity, 65, 98, DEFAULT_APPEARANCE.glassOpacity),
+        fontScale: clampNumber(stored.fontScale, 90, 120, DEFAULT_APPEARANCE.fontScale),
+    };
+}
+
+function saveAppearance(settings) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+function getSelectedTheme(settings) {
+    if (settings.theme !== 'custom') return THEMES[settings.theme] || THEMES.native;
+    return {
+        accent: settings.customColor,
+        tint: `color-mix(in srgb, ${settings.customColor} 17%, #171522)`,
+        text: '#f5f2ff',
+        muted: '#aaa4b8',
+        border: `color-mix(in srgb, ${settings.customColor} 34%, rgba(255, 255, 255, 0.16))`,
+        positive: '#73d9ad',
+        warning: '#e8bd72',
+        danger: '#ff7587',
+    };
+}
+
+function applyAppearance(panel, settings) {
+    const theme = getSelectedTheme(settings);
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const fontAdjustment = rootFontSize * ((settings.fontScale - 100) / 100);
+
+    panel.style.setProperty('--mpp-accent', theme.accent);
+    panel.style.setProperty('--mpp-tint', theme.tint);
+    panel.style.setProperty('--mpp-text', theme.text);
+    panel.style.setProperty('--mpp-muted', theme.muted);
+    panel.style.setProperty('--mpp-border', theme.border);
+    panel.style.setProperty('--mpp-positive', theme.positive);
+    panel.style.setProperty('--mpp-warning', theme.warning);
+    panel.style.setProperty('--mpp-danger', theme.danger);
+    panel.style.setProperty('--mpp-glass-opacity', `${settings.glassOpacity}%`);
+    panel.style.setProperty('--mpp-glass-strong-opacity', `${Math.min(100, settings.glassOpacity + 9)}%`);
+    panel.style.setProperty('--mpp-font-adjust', `${fontAdjustment.toFixed(2)}px`);
+    panel.dataset.mppTheme = settings.theme;
+    if (settings.theme === 'native') delete panel.dataset.mppIndependent;
+    else panel.dataset.mppIndependent = 'true';
+}
+
+function makeRange({ label, minimum, maximum, value, onInput }) {
+    const row = createElement('label', 'mpp-setting-row');
+    const labelElement = createElement('span', 'mpp-setting-label', label);
+    const control = createElement('span', 'mpp-range-wrap');
+    const input = createElement('input', 'mpp-range');
+    input.type = 'range';
+    input.min = String(minimum);
+    input.max = String(maximum);
+    input.value = String(value);
+    const output = createElement('output', 'mpp-range-output', `${value}%`);
+    input.addEventListener('input', () => {
+        const nextValue = Number(input.value);
+        output.textContent = `${nextValue}%`;
+        onInput(nextValue);
+    });
+    control.append(input, output);
+    row.append(labelElement, control);
+    return row;
+}
+
+function createAppearancePanel(panel, settingsButton) {
+    const settings = getAppearance();
+    applyAppearance(panel, settings);
+
+    const settingsPanel = createElement('section', 'mpp-appearance');
+    settingsPanel.hidden = true;
+    const header = createElement('header', 'mpp-appearance-header');
+    const copy = createElement('span', 'mpp-appearance-copy');
+    copy.append(createElement('strong', '', t('appearance')), createElement('small', '', t('appearanceHint')));
+    const closeButton = createIconButton('fa-xmark', t('close'), 'mpp-settings-close');
+    header.append(copy, closeButton);
+
+    const themeCopy = createElement('span', 'mpp-theme-copy');
+    themeCopy.append(createElement('strong', '', t('theme')), createElement('small', '', t('themeHint')));
+    const themeGrid = createElement('div', 'mpp-theme-grid');
+    themeGrid.setAttribute('role', 'radiogroup');
+    const themeLabels = { native: 'native', imperial: 'imperial', amethyst: 'amethyst', nord: 'nord', custom: 'custom' };
+
+    const refreshThemes = () => {
+        themeGrid.querySelectorAll('[data-mpp-theme-choice]').forEach(button => {
+            const active = button.dataset.mppThemeChoice === settings.theme;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-checked', String(active));
+        });
+    };
+
+    Object.keys(themeLabels).forEach(themeId => {
+        const previewTheme = themeId === 'custom'
+            ? { accent: settings.customColor, tint: '#171522', text: '#f5f2ff' }
+            : THEMES[themeId];
+        const button = createElement('button', 'mpp-theme-swatch');
+        button.type = 'button';
+        button.dataset.mppThemeChoice = themeId;
+        button.setAttribute('role', 'radio');
+        button.style.setProperty('--mpp-swatch-accent', previewTheme.accent);
+        button.style.setProperty('--mpp-swatch-tint', previewTheme.tint);
+        button.style.setProperty('--mpp-swatch-text', previewTheme.text);
+        const preview = createElement('span', 'mpp-theme-preview');
+        preview.append(createElement('i', 'is-accent'), createElement('i'), createElement('i', 'is-short'));
+        button.append(preview, createElement('span', 'mpp-theme-name', t(themeLabels[themeId])));
+        button.addEventListener('click', () => {
+            settings.theme = themeId;
+            saveAppearance(settings);
+            applyAppearance(panel, settings);
+            refreshThemes();
+        });
+        themeGrid.appendChild(button);
+    });
+
+    const colorRow = createElement('label', 'mpp-setting-row');
+    colorRow.appendChild(createElement('span', 'mpp-setting-label', t('customColor')));
+    const colorInput = createElement('input', 'mpp-color-input');
+    colorInput.type = 'color';
+    colorInput.value = settings.customColor;
+    colorInput.addEventListener('input', () => {
+        settings.customColor = normalizeColor(colorInput.value);
+        settings.theme = 'custom';
+        const swatch = themeGrid.querySelector('[data-mpp-theme-choice="custom"]');
+        swatch?.style.setProperty('--mpp-swatch-accent', settings.customColor);
+        saveAppearance(settings);
+        applyAppearance(panel, settings);
+        refreshThemes();
+    });
+    colorRow.appendChild(colorInput);
+
+    const glassRange = makeRange({
+        label: t('glass'), minimum: 65, maximum: 98, value: settings.glassOpacity,
+        onInput: value => {
+            settings.glassOpacity = value;
+            saveAppearance(settings);
+            applyAppearance(panel, settings);
+        },
+    });
+    const fontRange = makeRange({
+        label: t('font'), minimum: 90, maximum: 120, value: settings.fontScale,
+        onInput: value => {
+            settings.fontScale = value;
+            saveAppearance(settings);
+            applyAppearance(panel, settings);
+        },
+    });
+    const resetButton = createElement('button', 'mpp-button mpp-reset');
+    resetButton.type = 'button';
+    resetButton.append(createElement('i', 'fa-solid fa-arrow-rotate-left'), createElement('span', '', t('reset')));
+    resetButton.addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY);
+        const defaults = getAppearance();
+        Object.assign(settings, defaults);
+        applyAppearance(panel, settings);
+        colorInput.value = settings.customColor;
+        const customSwatch = themeGrid.querySelector('[data-mpp-theme-choice="custom"]');
+        customSwatch?.style.setProperty('--mpp-swatch-accent', settings.customColor);
+        const ranges = settingsPanel.querySelectorAll('.mpp-range');
+        const outputs = settingsPanel.querySelectorAll('.mpp-range-output');
+        if (ranges[0]) ranges[0].value = String(settings.glassOpacity);
+        if (ranges[1]) ranges[1].value = String(settings.fontScale);
+        if (outputs[0]) outputs[0].textContent = `${settings.glassOpacity}%`;
+        if (outputs[1]) outputs[1].textContent = `${settings.fontScale}%`;
+        refreshThemes();
+    });
+
+    const setOpen = open => {
+        settingsPanel.hidden = !open;
+        settingsButton.classList.toggle('is-active', open);
+        settingsButton.setAttribute('aria-expanded', String(open));
+    };
+    settingsButton.setAttribute('aria-expanded', 'false');
+    settingsButton.addEventListener('click', () => setOpen(settingsPanel.hidden));
+    closeButton.addEventListener('click', () => setOpen(false));
+    settingsPanel.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            setOpen(false);
+            settingsButton.focus();
+        }
+    });
+
+    settingsPanel.append(header, themeCopy, themeGrid, colorRow, glassRange, fontRange, resetButton);
+    refreshThemes();
+    return settingsPanel;
+}
+
+function createHero(panel, nativeHeader) {
+    const hero = createElement('header', 'mpp-hero');
+    const brand = createElement('div', 'mpp-brand');
+    const icon = createElement('span', 'mpp-brand-icon');
+    icon.innerHTML = '<i class="fa-solid fa-masks-theater" aria-hidden="true"></i>';
+    const brandCopy = createElement('span', 'mpp-brand-copy');
+    const titleRow = createElement('span', 'mpp-title-row');
+    titleRow.appendChild(createElement('h2', '', t('title')));
+    const nativeDocsLink = nativeHeader.querySelector('h3 a');
+    if (nativeDocsLink) titleRow.appendChild(nativeDocsLink);
+    brandCopy.append(titleRow, createElement('small', '', t('subtitle')));
+    brand.append(icon, brandCopy);
+
+    const actions = createElement('div', 'mpp-hero-actions');
+    const nativeActions = panel.querySelector('#personas_backup')?.parentElement;
+    if (nativeActions) {
+        nativeActions.classList.add('mpp-native-actions');
+        actions.appendChild(nativeActions);
+    }
+    const settingsButton = createIconButton('fa-gear', t('appearance'), 'mpp-settings-button');
+    actions.appendChild(settingsButton);
+    hero.append(brand, actions);
+    return { hero, settingsButton };
+}
+
+function makeGlobalSettingsCollapsible(section) {
+    if (!section || section.dataset.mppCollapsible === 'true') return;
+    section.dataset.mppCollapsible = 'true';
+    const heading = section.querySelector(':scope > h4');
+    if (!heading) return;
+
+    const header = createElement('div', 'mpp-section-header');
+    const toggle = createIconButton('fa-chevron-down', t('expand'), 'mpp-section-toggle');
+    const body = createElement('div', 'mpp-section-body');
+    const content = [...section.children].filter(child => child !== heading);
+    body.append(...content);
+    header.append(heading, toggle);
+    section.append(header, body);
+
+    let expanded = localStorage.getItem(GLOBAL_SECTION_KEY) === 'true';
+    const render = () => {
+        body.hidden = !expanded;
+        section.classList.toggle('is-collapsed', !expanded);
+        toggle.setAttribute('aria-expanded', String(expanded));
+        toggle.title = expanded ? t('collapse') : t('expand');
+        toggle.setAttribute('aria-label', toggle.title);
+    };
+    toggle.addEventListener('click', () => {
+        expanded = !expanded;
+        localStorage.setItem(GLOBAL_SECTION_KEY, String(expanded));
+        render();
+    });
+    render();
+}
+
+function updateCardBadges(card) {
+    let badges = card.querySelector(':scope > .mpp-card-badges');
+    if (!badges) {
+        badges = createElement('span', 'mpp-card-badges');
+        card.appendChild(badges);
+    }
+    const states = [
+        ['selected', 'active', 'fa-circle-check'],
+        ['default_persona', 'default', 'fa-crown'],
+        ['locked_to_chat', 'chat', 'fa-comments'],
+        ['locked_to_character', 'character', 'fa-user'],
+    ];
+    const activeStates = states.filter(([stateClass]) => card.classList.contains(stateClass));
+    const signature = activeStates.map(([, labelKey]) => labelKey).join('|');
+    if (badges.dataset.mppStates === signature) return;
+    badges.dataset.mppStates = signature;
+    badges.replaceChildren();
+
+    activeStates.forEach(([, labelKey, iconClass]) => {
+        const badge = createElement('span', `mpp-badge is-${labelKey}`);
+        badge.append(createElement('i', `fa-solid ${iconClass}`), createElement('span', '', t(labelKey)));
+        badges.appendChild(badge);
+    });
+    badges.hidden = badges.childElementCount === 0;
+}
+
+function decorateCards(avatarBlock) {
+    avatarBlock.querySelectorAll(':scope > .avatar-container').forEach(card => {
+        card.classList.add('mpp-persona-card');
+        card.setAttribute('role', 'button');
+        card.tabIndex = 0;
+        const name = card.querySelector('.ch_name')?.textContent?.trim() || t('title');
+        const image = card.querySelector('.avatar img');
+        if (image) image.alt = name;
+        if (card.dataset.mppKeyboard !== 'true') {
+            card.dataset.mppKeyboard = 'true';
+            card.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    card.click();
+                }
+            });
+        }
+        updateCardBadges(card);
+    });
+}
+
+async function refreshPersonaCount(counter) {
+    counter.textContent = t('loading');
+    try {
+        const avatars = await getUserAvatars(false);
+        const count = Array.isArray(avatars) ? avatars.length : 0;
+        counter.textContent = formatPersonaCount(count);
+    } catch (error) {
+        console.warn(`[${EXTENSION_NAME}] Could not count personas.`, error);
+        counter.textContent = t('personaMany');
+    }
+}
+
+function enhancePanel(panel) {
+    if (!(panel instanceof HTMLElement) || panel.dataset.mppEnhanced === 'true') return;
+    panel.dataset.mppEnhanced = 'true';
+    panel.classList.add('mpp-panel');
+
+    const shell = panel.firstElementChild;
+    const nativeHeader = shell?.querySelector(':scope > .flex-container.alignItemsBaseline');
+    const main = panel.querySelector('#persona-management-block');
+    const leftColumn = main?.querySelector('.persona_management_left_column');
+    const rightColumn = main?.querySelector('.persona_management_right_column');
+    const avatarBlock = panel.querySelector('#user_avatar_block');
+    if (!shell || !nativeHeader || !main || !leftColumn || !rightColumn || !avatarBlock) {
+        console.warn(`[${EXTENSION_NAME}] Native Persona Management structure was not recognized.`);
+        return;
+    }
+
+    const { hero, settingsButton } = createHero(panel, nativeHeader);
+    const appearance = createAppearancePanel(panel, settingsButton);
+    nativeHeader.hidden = true;
+    shell.prepend(hero, appearance);
+
+    main.classList.add('mpp-main');
+    leftColumn.classList.add('mpp-library-column');
+    rightColumn.classList.add('mpp-editor-column');
+    const nativeToolbar = leftColumn.firstElementChild;
+    nativeToolbar?.classList.add('mpp-library-toolbar');
+    const libraryHeader = createElement('header', 'mpp-library-header');
+    const libraryTitle = createElement('h3', '', t('library'));
+    const personaCounter = createElement('span', 'mpp-persona-counter', t('loading'));
+    libraryHeader.append(libraryTitle, personaCounter);
+    leftColumn.prepend(libraryHeader);
+
+    makeGlobalSettingsCollapsible(rightColumn.querySelector('.persona_management_global_settings'));
+    decorateCards(avatarBlock);
+    refreshPersonaCount(personaCounter);
+
+    let updateQueued = false;
+    let countTimer;
+    const avatarObserver = new MutationObserver(() => {
+        if (!updateQueued) {
+            updateQueued = true;
+            requestAnimationFrame(() => {
+                updateQueued = false;
+                decorateCards(avatarBlock);
+            });
+        }
+        window.clearTimeout(countTimer);
+        countTimer = window.setTimeout(() => refreshPersonaCount(personaCounter), 250);
+    });
+    avatarObserver.observe(avatarBlock, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+
+    const nameElement = panel.querySelector('#your_name');
+    if (nameElement) {
+        new MutationObserver(() => decorateCards(avatarBlock)).observe(nameElement, { childList: true, characterData: true, subtree: true });
+    }
+}
+
+function scan(node = document) {
+    if (node instanceof Element && node.matches(PANEL_SELECTOR)) enhancePanel(node);
+    node.querySelectorAll?.(PANEL_SELECTOR).forEach(enhancePanel);
+}
+
+function init() {
+    scan();
+    new MutationObserver(mutations => {
+        mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
+            if (node instanceof Element) scan(node);
+        }));
+    }).observe(document.body, { childList: true, subtree: true });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+} else {
+    init();
+}
