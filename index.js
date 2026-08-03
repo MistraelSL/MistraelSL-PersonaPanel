@@ -4,6 +4,7 @@ const EXTENSION_NAME = 'MistraelSL Persona Panel';
 const PANEL_SELECTOR = '#PersonaManagement';
 const STORAGE_KEY = 'mistraelsl-persona-panel:appearance';
 const GLOBAL_SECTION_KEY = 'mistraelsl-persona-panel:global-expanded';
+const EDITOR_SECTION_KEY = 'mistraelsl-persona-panel:editor-expanded';
 
 const DEFAULT_APPEARANCE = Object.freeze({
     theme: 'native',
@@ -66,6 +67,15 @@ const I18N = {
         expand: 'Expand section',
         collapse: 'Collapse section',
         loading: 'Loading…',
+        all: 'All',
+        current: 'Current',
+        linked: 'Linked',
+        filters: 'Persona filters',
+        selectedPersona: 'Current persona',
+        noSelection: 'Select a persona to see its details',
+        showEditor: 'Show persona editor',
+        hideEditor: 'Hide persona editor',
+        closePanel: 'Close persona panel',
     },
     ru: {
         title: 'Панель персон',
@@ -95,6 +105,15 @@ const I18N = {
         expand: 'Развернуть раздел',
         collapse: 'Свернуть раздел',
         loading: 'Загрузка…',
+        all: 'Все',
+        current: 'Текущая',
+        linked: 'Привязанные',
+        filters: 'Фильтры персон',
+        selectedPersona: 'Текущая персона',
+        noSelection: 'Выберите персону, чтобы увидеть подробности',
+        showEditor: 'Показать редактор персоны',
+        hideEditor: 'Скрыть редактор персоны',
+        closePanel: 'Закрыть панель персон',
     },
 };
 
@@ -374,9 +393,94 @@ function createHero(panel, nativeHeader) {
         actions.appendChild(nativeActions);
     }
     const settingsButton = createIconButton('fa-gear', t('appearance'), 'mpp-settings-button');
-    actions.appendChild(settingsButton);
+    const editorButton = createIconButton('fa-pen-to-square', t('hideEditor'), 'mpp-editor-button');
+    const closeButton = createIconButton('fa-xmark', t('closePanel'), 'mpp-panel-close');
+    closeButton.addEventListener('click', () => {
+        document.querySelector('#persona-management-button .drawer-toggle')?.click();
+    });
+    actions.append(settingsButton, editorButton, closeButton);
     hero.append(brand, actions);
-    return { hero, settingsButton };
+    return { hero, settingsButton, editorButton };
+}
+
+function createSpotlight(panel, editorButton) {
+    const spotlight = createElement('section', 'mpp-spotlight');
+    const portrait = createElement('span', 'mpp-spotlight-portrait');
+    const image = createElement('img');
+    image.alt = '';
+    portrait.appendChild(image);
+
+    const copy = createElement('span', 'mpp-spotlight-copy');
+    const kicker = createElement('small', '', t('selectedPersona'));
+    const name = createElement('strong', '', t('loading'));
+    const hint = createElement('span', '', t('noSelection'));
+    copy.append(kicker, name, hint);
+
+    const openEditor = createElement('button', 'mpp-button mpp-spotlight-edit');
+    openEditor.type = 'button';
+    openEditor.append(createElement('i', 'fa-solid fa-pen-to-square'), createElement('span', '', t('showEditor')));
+    openEditor.addEventListener('click', () => {
+        if (panel.classList.contains('mpp-editor-collapsed')) editorButton.click();
+        panel.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    spotlight.append(portrait, copy, openEditor);
+
+    const update = () => {
+        const selected = panel.querySelector('#user_avatar_block > .avatar-container.selected')
+            || panel.querySelector('#user_avatar_block > .avatar-container');
+        const selectedImage = selected?.querySelector('.avatar img');
+        const selectedName = panel.querySelector('#your_name')?.textContent?.trim()
+            || selected?.querySelector('.ch_name')?.textContent?.trim();
+        image.src = selectedImage?.src || '';
+        portrait.hidden = !selectedImage?.src;
+        name.textContent = selectedName || t('noSelection');
+        hint.textContent = selected?.classList.contains('default_persona')
+            ? t('default')
+            : selected?.classList.contains('locked_to_chat') || selected?.classList.contains('locked_to_character')
+                ? t('linked')
+                : t('active');
+    };
+
+    return { spotlight, update };
+}
+
+function createFilterBar(avatarBlock) {
+    const bar = createElement('nav', 'mpp-filters');
+    bar.setAttribute('aria-label', t('filters'));
+    const definitions = [
+        ['all', 'fa-border-all', () => true],
+        ['current', 'fa-circle-check', card => card.classList.contains('selected')],
+        ['default', 'fa-crown', card => card.classList.contains('default_persona')],
+        ['linked', 'fa-link', card => card.classList.contains('locked_to_chat') || card.classList.contains('locked_to_character')],
+    ];
+    let activeFilter = 'all';
+
+    const apply = () => {
+        const predicate = definitions.find(([id]) => id === activeFilter)?.[2] || (() => true);
+        avatarBlock.querySelectorAll(':scope > .avatar-container').forEach(card => {
+            card.classList.toggle('mpp-filter-hidden', !predicate(card));
+        });
+    };
+
+    definitions.forEach(([id, icon]) => {
+        const button = createElement('button', `mpp-filter${id === activeFilter ? ' is-active' : ''}`);
+        button.type = 'button';
+        button.dataset.mppFilter = id;
+        button.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', t(id)));
+        button.addEventListener('click', () => {
+            activeFilter = id;
+            bar.querySelectorAll('.mpp-filter').forEach(item => {
+                const active = item.dataset.mppFilter === activeFilter;
+                item.classList.toggle('is-active', active);
+                item.setAttribute('aria-pressed', String(active));
+            });
+            apply();
+        });
+        button.setAttribute('aria-pressed', String(id === activeFilter));
+        bar.appendChild(button);
+    });
+
+    return { bar, apply };
 }
 
 function makeGlobalSettingsCollapsible(section) {
@@ -484,10 +588,11 @@ function enhancePanel(panel) {
         return;
     }
 
-    const { hero, settingsButton } = createHero(panel, nativeHeader);
+    const { hero, settingsButton, editorButton } = createHero(panel, nativeHeader);
     const appearance = createAppearancePanel(panel, settingsButton);
+    const { spotlight, update: updateSpotlight } = createSpotlight(panel, editorButton);
     nativeHeader.hidden = true;
-    shell.prepend(hero, appearance);
+    shell.prepend(hero, appearance, spotlight);
 
     main.classList.add('mpp-main');
     leftColumn.classList.add('mpp-library-column');
@@ -499,9 +604,28 @@ function enhancePanel(panel) {
     const personaCounter = createElement('span', 'mpp-persona-counter', t('loading'));
     libraryHeader.append(libraryTitle, personaCounter);
     leftColumn.prepend(libraryHeader);
+    const { bar: filters, apply: applyFilter } = createFilterBar(avatarBlock);
+    nativeToolbar?.after(filters);
+
+    let editorExpanded = localStorage.getItem(EDITOR_SECTION_KEY) !== 'false';
+    const renderEditorState = () => {
+        panel.classList.toggle('mpp-editor-collapsed', !editorExpanded);
+        editorButton.classList.toggle('is-active', editorExpanded);
+        editorButton.setAttribute('aria-expanded', String(editorExpanded));
+        editorButton.title = editorExpanded ? t('hideEditor') : t('showEditor');
+        editorButton.setAttribute('aria-label', editorButton.title);
+    };
+    editorButton.addEventListener('click', () => {
+        editorExpanded = !editorExpanded;
+        localStorage.setItem(EDITOR_SECTION_KEY, String(editorExpanded));
+        renderEditorState();
+    });
+    renderEditorState();
 
     makeGlobalSettingsCollapsible(rightColumn.querySelector('.persona_management_global_settings'));
     decorateCards(avatarBlock);
+    applyFilter();
+    updateSpotlight();
     refreshPersonaCount(personaCounter);
 
     let updateQueued = false;
@@ -512,6 +636,8 @@ function enhancePanel(panel) {
             requestAnimationFrame(() => {
                 updateQueued = false;
                 decorateCards(avatarBlock);
+                applyFilter();
+                updateSpotlight();
             });
         }
         window.clearTimeout(countTimer);
@@ -521,7 +647,10 @@ function enhancePanel(panel) {
 
     const nameElement = panel.querySelector('#your_name');
     if (nameElement) {
-        new MutationObserver(() => decorateCards(avatarBlock)).observe(nameElement, { childList: true, characterData: true, subtree: true });
+        new MutationObserver(() => {
+            decorateCards(avatarBlock);
+            updateSpotlight();
+        }).observe(nameElement, { childList: true, characterData: true, subtree: true });
     }
 }
 
