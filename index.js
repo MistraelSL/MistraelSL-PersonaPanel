@@ -1,5 +1,4 @@
-import { eventSource, event_types } from '../../../script.js';
-import { getUserAvatars, setUserAvatar, user_avatar } from '../../../personas.js';
+import { getUserAvatars, setUserAvatar } from '../../../personas.js';
 import { power_user } from '../../../power-user.js';
 
 const EXTENSION_NAME = 'MistraelSL Persona Panel';
@@ -532,9 +531,8 @@ function createHero(panel, nativeHeader) {
         actions.appendChild(nativeActions);
     }
     const windowModeButton = createIconButton('fa-expand', t('expandWindow'), 'mpp-window-mode-button');
-    const settingsButton = createIconButton('fa-paintbrush', t('appearance'), 'mpp-settings-button');
+    const settingsButton = createIconButton('fa-gear', t('appearance'), 'mpp-settings-button');
     const editorButton = createIconButton('fa-pen-to-square', t('hideEditor'), 'mpp-editor-button');
-    editorButton.hidden = true;
     const closeButton = createIconButton('fa-xmark', t('closePanel'), 'mpp-panel-close');
     let windowMode = localStorage.getItem(WINDOW_MODE_KEY) === 'tall' ? 'tall' : 'standard';
     const renderWindowMode = () => {
@@ -840,7 +838,8 @@ function createSpotlight(panel, editorButton) {
     image.addEventListener('load', () => applyCrop(currentCrop));
 
     const update = () => {
-        const selected = findCurrentPersonaCard(panel.querySelector('#user_avatar_block'));
+        const selected = panel.querySelector('#user_avatar_block > .avatar-container.selected')
+            || panel.querySelector('#user_avatar_block > .avatar-container');
         const selectedImage = selected?.querySelector('.avatar img');
         const selectedName = panel.querySelector('#your_name')?.textContent?.trim()
             || selected?.querySelector('.ch_name')?.textContent?.trim();
@@ -852,9 +851,9 @@ function createSpotlight(panel, editorButton) {
         slidersButton.hidden = !selectedImage?.src || !currentAvatarId;
         applyCrop(getPortraitCrop(currentAvatarId));
         name.textContent = selectedName || t('noSelection');
-        hint.textContent = isDefaultPersona(selected)
+        hint.textContent = selected?.classList.contains('default_persona')
             ? t('default')
-            : isLinkedPersona(selected)
+            : selected?.classList.contains('locked_to_chat') || selected?.classList.contains('locked_to_character')
                 ? t('linked')
                 : t('active');
     };
@@ -867,9 +866,9 @@ function createFilterBar(avatarBlock) {
     bar.setAttribute('aria-label', t('filters'));
     const definitions = [
         ['all', 'fa-border-all', () => true],
-        ['current', 'fa-circle-check', isCurrentPersona],
-        ['default', 'fa-crown', isDefaultPersona],
-        ['linked', 'fa-link', isLinkedPersona],
+        ['current', 'fa-circle-check', card => card.classList.contains('selected')],
+        ['default', 'fa-crown', card => card.classList.contains('default_persona')],
+        ['linked', 'fa-link', card => card.classList.contains('locked_to_chat') || card.classList.contains('locked_to_character')],
     ];
     let activeFilter = 'all';
 
@@ -979,60 +978,9 @@ function makeGlobalSettingsCollapsible(section) {
 }
 
 function getCardAvatarId(card) {
-    if (!(card instanceof HTMLElement)) return '';
     return card.dataset.avatarId
         || card.querySelector('.avatar[data-avatar-id]')?.dataset.avatarId
         || '';
-}
-
-function findCurrentPersonaCard(avatarBlock) {
-    if (!(avatarBlock instanceof HTMLElement)) return null;
-    const cards = [...avatarBlock.querySelectorAll(':scope > .avatar-container')];
-    return cards.find(card => getCardAvatarId(card) === user_avatar)
-        || cards.find(card => card.classList.contains('selected'))
-        || cards[0]
-        || null;
-}
-
-function isCurrentPersona(card) {
-    const avatarId = getCardAvatarId(card);
-    return Boolean(avatarId && (avatarId === user_avatar || card.classList.contains('selected')));
-}
-
-function isDefaultPersona(card) {
-    const avatarId = getCardAvatarId(card);
-    return Boolean(avatarId && (avatarId === power_user.default_persona || card.classList.contains('default_persona')));
-}
-
-function isLinkedPersona(card) {
-    const avatarId = getCardAvatarId(card);
-    if (!avatarId) return false;
-    const connections = power_user.persona_descriptions?.[avatarId]?.connections;
-    const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
-    return chatPersona === avatarId
-        || (Array.isArray(connections) && connections.length > 0)
-        || card.classList.contains('locked_to_chat')
-        || card.classList.contains('locked_to_character');
-}
-
-function withImageRevision(source) {
-    if (!source || source.startsWith('blob:') || source.startsWith('data:')) return source;
-    try {
-        const url = new URL(source, document.baseURI);
-        url.searchParams.set('mppv', String(Date.now()));
-        return url.href;
-    } catch {
-        return source;
-    }
-}
-
-function looksLikeSaveControl(control) {
-    if (!(control instanceof HTMLElement)) return false;
-    if (control.matches('button[type="submit"], input[type="submit"]')) return true;
-    const label = [control.id, control.getAttribute('title'), control.getAttribute('aria-label'), control.textContent]
-        .filter(Boolean)
-        .join(' ');
-    return /(?:save|update|сохран|обнов)/i.test(label) && !/(?:delete|remove|удал)/i.test(label);
 }
 
 function sanitizeFileName(value) {
@@ -1137,12 +1085,12 @@ function updateCardBadges(card) {
         card.appendChild(badges);
     }
     const states = [
-        [isCurrentPersona(card), 'active', 'fa-circle-check'],
-        [isDefaultPersona(card), 'default', 'fa-crown'],
-        [card.classList.contains('locked_to_chat'), 'chat', 'fa-comments'],
-        [card.classList.contains('locked_to_character'), 'character', 'fa-user'],
+        ['selected', 'active', 'fa-circle-check'],
+        ['default_persona', 'default', 'fa-crown'],
+        ['locked_to_chat', 'chat', 'fa-comments'],
+        ['locked_to_character', 'character', 'fa-user'],
     ];
-    const activeStates = states.filter(([active]) => active);
+    const activeStates = states.filter(([stateClass]) => card.classList.contains(stateClass));
     const signature = activeStates.map(([, labelKey]) => labelKey).join('|');
     if (badges.dataset.mppStates === signature) return;
     badges.dataset.mppStates = signature;
@@ -1255,32 +1203,6 @@ function enhancePanel(panel) {
     });
     renderEditorState();
 
-    let preservePanelAfterSave = false;
-    let preservePanelTimer;
-    let lastSaveClick = 0;
-    const ensurePanelStaysOpen = () => {
-        if (!preservePanelAfterSave) return;
-        preservePanelAfterSave = false;
-        window.clearTimeout(preservePanelTimer);
-        const reopen = () => {
-            if (!panel.classList.contains('openDrawer')) {
-                document.querySelector('#persona-management-button .drawer-toggle')?.click();
-            }
-        };
-        requestAnimationFrame(reopen);
-        window.setTimeout(reopen, 120);
-    };
-    rightColumn.addEventListener('click', event => {
-        const control = event.target instanceof Element
-            ? event.target.closest('button, input[type="button"], input[type="submit"], .menu_button')
-            : null;
-        if (!looksLikeSaveControl(control) || !panel.classList.contains('openDrawer')) return;
-        preservePanelAfterSave = true;
-        lastSaveClick = Date.now();
-        window.clearTimeout(preservePanelTimer);
-        preservePanelTimer = window.setTimeout(ensurePanelStaysOpen, 600);
-    }, true);
-
     makeGlobalSettingsCollapsible(rightColumn.querySelector('.persona_management_global_settings'));
     decorateCards(avatarBlock);
     applyFilter();
@@ -1297,11 +1219,7 @@ function enhancePanel(panel) {
             mutation.type === 'attributes'
             && mutation.target instanceof HTMLElement
             && mutation.target.parentElement === avatarBlock);
-        const imageChanged = mutations.some(mutation =>
-            mutation.type === 'attributes'
-            && mutation.attributeName === 'src'
-            && mutation.target instanceof HTMLImageElement);
-        if (!cardsChanged && !cardStateChanged && !imageChanged) return;
+        if (!cardsChanged && !cardStateChanged) return;
         pendingCardsChanged ||= cardsChanged;
 
         if (!updateQueued) {
@@ -1320,26 +1238,7 @@ function enhancePanel(panel) {
             countTimer = window.setTimeout(() => refreshPersonaCount(personaCounter), 250);
         }
     });
-    avatarObserver.observe(avatarBlock, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'src'] });
-
-    const queuePersonaRefresh = (refreshImage = false) => {
-        requestAnimationFrame(() => {
-            if (refreshImage) {
-                const cardImage = findCurrentPersonaCard(avatarBlock)?.querySelector('.avatar img');
-                if (cardImage instanceof HTMLImageElement) cardImage.src = withImageRevision(cardImage.src);
-            }
-            decorateCards(avatarBlock);
-            applyFilter();
-            updateSpotlight();
-        });
-    };
-    eventSource.on(event_types.PERSONA_CHANGED, () => queuePersonaRefresh());
-    eventSource.on(event_types.PERSONA_UPDATED, () => {
-        const followsNativeSave = Date.now() - lastSaveClick < 5000;
-        ensurePanelStaysOpen();
-        queuePersonaRefresh(followsNativeSave);
-    });
-    eventSource.on(event_types.CHAT_CHANGED, () => queuePersonaRefresh());
+    avatarObserver.observe(avatarBlock, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
     const nameElement = panel.querySelector('#your_name');
     if (nameElement) {
