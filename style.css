@@ -720,7 +720,7 @@
 .mpp-library-header h3 {
     margin: 0;
     color: var(--mpp-text);
-    font-size: calc(0.92rem + var(--mpp-font-adjust));
+    font-size: calc(0.98rem + var(--mpp-font-adjust));
 }
 
 .mpp-persona-counter {
@@ -815,6 +815,11 @@
 
 #PersonaManagement.mpp-panel .mpp-library-toolbar input::placeholder { color: var(--mpp-muted); }
 
+#PersonaManagement.mpp-panel .mpp-library-toolbar > .mpp-persona-counter {
+    padding-inline: 4px;
+    font-size: calc(0.68rem + var(--mpp-font-adjust));
+}
+
 #PersonaManagement.mpp-panel #persona_pagination_container {
     min-width: 0;
     grid-column: 1 / -1;
@@ -839,6 +844,29 @@
 }
 
 .mpp-filters::-webkit-scrollbar { display: none; }
+
+#PersonaManagement.mpp-panel .mpp-create-persona {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-width: max-content;
+    min-height: 30px;
+    margin: 0 0 0 auto !important;
+    padding: 5px 12px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text));
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 45%, var(--mpp-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mpp-accent) 12%, rgba(255, 255, 255, 0.035));
+    filter: none;
+}
+
+#PersonaManagement.mpp-panel .mpp-create-persona:hover {
+    color: var(--mpp-text);
+    border-color: var(--mpp-accent);
+    background: color-mix(in srgb, var(--mpp-accent) 20%, rgba(255, 255, 255, 0.045));
+}
 
 .mpp-filter {
     display: inline-flex;
@@ -1385,7 +1413,7 @@
         min-width: min(760px, calc(100dvw - 64px));
         max-width: calc(100dvw - 64px) !important;
         margin: 0 !important;
-        border-radius: 24px;
+        border-radius: 24px !important;
         transform: translate(-50%, calc(-50% - 14px)) scale(0.992);
         transform-origin: center;
     }

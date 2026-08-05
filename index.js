@@ -80,6 +80,7 @@ const I18N = {
         expand: 'Expand section',
         collapse: 'Collapse section',
         loading: 'Loading…',
+        searchByPersonaName: 'Search by persona name',
         all: 'All',
         current: 'Current',
         linked: 'Linked',
@@ -142,6 +143,7 @@ const I18N = {
         expand: 'Развернуть раздел',
         collapse: 'Свернуть раздел',
         loading: 'Загрузка…',
+        searchByPersonaName: 'Поиск по имени персоны',
         all: 'Все',
         current: 'Текущая',
         linked: 'Привязанные',
@@ -699,7 +701,11 @@ function createSpotlight(panel, editorButton) {
         slidersButton.classList.toggle('is-active', open);
         slidersButton.setAttribute('aria-expanded', String(open));
     };
-    slidersButton.addEventListener('click', () => setCropPanelOpen(cropPanel.hidden));
+    slidersButton.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        setCropPanelOpen(cropPanel.hidden);
+    });
     closeCropButton.addEventListener('click', () => setCropPanelOpen(false));
     cropPanel.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
@@ -773,7 +779,11 @@ function createSpotlight(panel, editorButton) {
         });
     };
 
-    visualCropButton.addEventListener('click', openVisualCrop);
+    visualCropButton.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openVisualCrop();
+    });
     stageImage.addEventListener('load', () => renderModalCrop(currentCrop));
     modalClose.addEventListener('click', () => closeVisualCrop(false));
     cancelCropButton.addEventListener('click', () => closeVisualCrop(false));
@@ -781,7 +791,11 @@ function createSpotlight(panel, editorButton) {
         savePortraitCrop(currentAvatarId, currentCrop);
         closeVisualCrop(true);
     });
+    ['pointerdown', 'mousedown'].forEach(eventName => {
+        cropModalBackdrop.addEventListener(eventName, event => event.stopPropagation());
+    });
     cropModalBackdrop.addEventListener('click', event => {
+        event.stopPropagation();
         if (event.target === cropModalBackdrop) closeVisualCrop(false);
     });
     cropModalBackdrop.addEventListener('keydown', event => {
@@ -868,8 +882,8 @@ function createFilterBar(avatarBlock) {
     const definitions = [
         ['all', 'fa-border-all', () => true],
         ['current', 'fa-circle-check', card => card.classList.contains('selected')],
-        ['default', 'fa-crown', card => card.classList.contains('default_persona')],
-        ['linked', 'fa-link', card => card.classList.contains('locked_to_chat') || card.classList.contains('locked_to_character')],
+        ['default', 'fa-crown', isDefaultPersonaCard],
+        ['linked', 'fa-link', isLinkedPersonaCard],
     ];
     let activeFilter = 'all';
 
@@ -885,7 +899,9 @@ function createFilterBar(avatarBlock) {
         button.type = 'button';
         button.dataset.mppFilter = id;
         button.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', t(id)));
-        button.addEventListener('click', () => {
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
             activeFilter = id;
             bar.querySelectorAll('.mpp-filter').forEach(item => {
                 const active = item.dataset.mppFilter === activeFilter;
@@ -982,6 +998,22 @@ function getCardAvatarId(card) {
     return card.dataset.avatarId
         || card.querySelector('.avatar[data-avatar-id]')?.dataset.avatarId
         || '';
+}
+
+function isDefaultPersonaCard(card) {
+    const avatarId = getCardAvatarId(card);
+    return Boolean(avatarId && (avatarId === power_user.default_persona || card.classList.contains('default_persona')));
+}
+
+function isLinkedPersonaCard(card) {
+    const avatarId = getCardAvatarId(card);
+    if (!avatarId) return false;
+    const connections = power_user.persona_descriptions?.[avatarId]?.connections;
+    const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
+    return chatPersona === avatarId
+        || (Array.isArray(connections) && connections.length > 0)
+        || card.classList.contains('locked_to_chat')
+        || card.classList.contains('locked_to_character');
 }
 
 function sanitizeFileName(value) {
@@ -1172,11 +1204,23 @@ function enhancePanel(panel) {
     const libraryCopy = createElement('span', 'mpp-library-copy');
     const libraryTitle = createElement('h3', '', t('library'));
     const personaCounter = createElement('span', 'mpp-persona-counter', t('loading'));
-    libraryCopy.append(libraryTitle, personaCounter);
+    const desktopLibraryLayout = window.matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
+    libraryCopy.appendChild(libraryTitle);
+    if (!desktopLibraryLayout) libraryCopy.appendChild(personaCounter);
     const densityControls = createDensityControls(avatarBlock);
     libraryHeader.append(libraryCopy, densityControls);
     leftColumn.prepend(libraryHeader);
     const { bar: filters, apply: applyFilter } = createFilterBar(avatarBlock);
+    if (desktopLibraryLayout && nativeToolbar) {
+        const createButton = nativeToolbar.querySelector(':scope > .menu_button:not(#persona_grid_toggle), :scope > button:not(#persona_grid_toggle)');
+        const searchInput = nativeToolbar.querySelector('input[type="search"], input[type="text"]');
+        nativeToolbar.prepend(personaCounter);
+        if (searchInput) searchInput.placeholder = t('searchByPersonaName');
+        if (createButton) {
+            createButton.classList.add('mpp-create-persona');
+            filters.appendChild(createButton);
+        }
+    }
     nativeToolbar?.after(filters);
 
     const editorHead = createElement('header', 'mpp-editor-head');
