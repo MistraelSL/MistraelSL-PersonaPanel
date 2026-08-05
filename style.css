@@ -760,19 +760,28 @@
 }
 
 .mpp-creator-left {
-    display: flex;
+    display: grid;
     min-width: 0;
     min-height: 0;
-    flex-direction: column;
+    grid-template-rows: clamp(260px, 38dvh, 360px) auto minmax(0, 1fr);
+    align-content: stretch;
     gap: 14px;
+    overflow: hidden;
+}
+
+.mpp-creator-photo-frame {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
 }
 
 #PersonaManagement.mpp-panel .mpp-creator-photo {
     position: relative;
     display: grid;
     min-width: 0;
-    min-height: 260px;
-    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
     padding: 0;
     place-items: center;
     overflow: hidden;
@@ -796,11 +805,60 @@
 }
 
 .mpp-creator-photo img {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     max-width: none;
     max-height: none;
-    object-fit: cover;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-photo-crop {
+    position: absolute;
+    z-index: 3;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--mpp-tint) 88%, transparent);
+}
+
+.mpp-creator-photo-crop-controls {
+    position: absolute;
+    z-index: 4;
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    display: grid;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 38%, var(--mpp-border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--mpp-tint) 94%, #000 10%);
+}
+
+.mpp-creator-photo-crop-controls[hidden] { display: none !important; }
+
+.mpp-creator-photo-crop-controls label {
+    display: grid;
+    grid-template-columns: minmax(76px, auto) minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 7px;
+    color: var(--mpp-text);
+    font-size: calc(0.65rem + var(--mpp-font-adjust));
+}
+
+.mpp-creator-photo-crop-controls input {
+    width: 100%;
+    accent-color: var(--mpp-accent);
+}
+
+.mpp-creator-photo-crop-controls output {
+    color: var(--mpp-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
 .mpp-creator-photo-empty {
@@ -852,7 +910,7 @@
     display: grid;
     min-width: 0;
     min-height: 0;
-    grid-template-rows: auto minmax(220px, 1fr) auto auto;
+    grid-template-rows: auto minmax(260px, 1fr) minmax(140px, 28%);
     align-content: stretch;
     gap: 12px;
     overflow: hidden;
@@ -951,7 +1009,10 @@
 
 .mpp-creator-tool-stage {
     min-width: 0;
+    min-height: 0;
     padding: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
     border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
     border-radius: 20px;
     background: color-mix(in srgb, var(--mpp-accent) 5%, var(--mpp-surface));
@@ -968,7 +1029,7 @@
 
 .mpp-creator-depth-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
 }
 
@@ -979,7 +1040,7 @@
 }
 
 .mpp-creator-connections {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
 }
 
 #PersonaManagement.mpp-panel .mpp-creator-connection {
