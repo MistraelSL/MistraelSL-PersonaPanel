@@ -9,6 +9,8 @@ const EDITOR_SECTION_KEY = 'mistraelsl-persona-panel:editor-expanded-v3';
 const DENSITY_KEY = 'MistraelSL_PersonaPanel_density';
 const MOBILE_COLUMNS_KEY = 'MistraelSL_PersonaPanel_mobileColumns';
 const FAVORITES_KEY = 'MistraelSL_PersonaPanel_favorites';
+const WINDOW_MODE_KEY = 'MistraelSL_PersonaPanel_windowMode';
+const PORTRAIT_CROP_KEY = 'MistraelSL_PersonaPanel_portraitCrop';
 
 const DEFAULT_APPEARANCE = Object.freeze({
     theme: 'native',
@@ -99,6 +101,15 @@ const I18N = {
         editPersona: 'Edit persona',
         deletePersona: 'Delete persona',
         exportPersona: 'Export persona JSON',
+        byMistraelSL: 'by MistraelSL',
+        expandWindow: 'Use tall window',
+        reduceWindow: 'Use standard window',
+        cropPortrait: 'Adjust current persona portrait',
+        cropHorizontal: 'Horizontal position',
+        cropVertical: 'Vertical position',
+        cropZoom: 'Zoom',
+        resetCrop: 'Reset framing',
+        closeCrop: 'Close framing settings',
     },
     ru: {
         title: 'Панель персон',
@@ -148,6 +159,15 @@ const I18N = {
         editPersona: 'Редактировать персону',
         deletePersona: 'Удалить персону',
         exportPersona: 'Экспортировать персону в JSON',
+        byMistraelSL: 'от MistraelSL',
+        expandWindow: 'Развернуть панель по высоте',
+        reduceWindow: 'Вернуть обычную высоту',
+        cropPortrait: 'Настроить портрет текущей персоны',
+        cropHorizontal: 'Положение по горизонтали',
+        cropVertical: 'Положение по вертикали',
+        cropZoom: 'Приближение',
+        resetCrop: 'Сбросить кадрирование',
+        closeCrop: 'Закрыть настройки кадрирования',
     },
 };
 
@@ -202,6 +222,38 @@ const favoritePersonas = loadFavorites();
 
 function saveFavorites() {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoritePersonas]));
+}
+
+function loadPortraitCrops() {
+    try {
+        const value = JSON.parse(localStorage.getItem(PORTRAIT_CROP_KEY) || '{}');
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch {
+        return {};
+    }
+}
+
+const portraitCrops = loadPortraitCrops();
+
+function getPortraitCrop(avatarId) {
+    const stored = portraitCrops[avatarId] || {};
+    return {
+        x: clampNumber(stored.x, 0, 100, 50),
+        y: clampNumber(stored.y, 0, 100, 22),
+        zoom: clampNumber(stored.zoom, 100, 200, 100),
+    };
+}
+
+function savePortraitCrop(avatarId, crop) {
+    if (!avatarId) return;
+    portraitCrops[avatarId] = crop;
+    localStorage.setItem(PORTRAIT_CROP_KEY, JSON.stringify(portraitCrops));
+}
+
+function resetPortraitCrop(avatarId) {
+    if (!avatarId) return;
+    delete portraitCrops[avatarId];
+    localStorage.setItem(PORTRAIT_CROP_KEY, JSON.stringify(portraitCrops));
 }
 
 function createIconButton(icon, label, className = '') {
@@ -432,7 +484,9 @@ function createHero(panel, nativeHeader) {
     icon.innerHTML = '<i class="fa-solid fa-masks-theater" aria-hidden="true"></i>';
     const brandCopy = createElement('span', 'mpp-brand-copy');
     const titleRow = createElement('span', 'mpp-title-row');
-    titleRow.appendChild(createElement('h2', '', t('title')));
+    const title = createElement('h2');
+    title.append(document.createTextNode(t('title')), createElement('span', 'mpp-brand-attribution', ` ${t('byMistraelSL')}`));
+    titleRow.appendChild(title);
     const nativeDocsLink = nativeHeader.querySelector('h3 a');
     if (nativeDocsLink) titleRow.appendChild(nativeDocsLink);
     brandCopy.append(titleRow, createElement('small', '', t('subtitle')));
@@ -444,15 +498,50 @@ function createHero(panel, nativeHeader) {
         nativeActions.classList.add('mpp-native-actions');
         actions.appendChild(nativeActions);
     }
+    const windowModeButton = createIconButton('fa-expand', t('expandWindow'), 'mpp-window-mode-button');
     const settingsButton = createIconButton('fa-gear', t('appearance'), 'mpp-settings-button');
     const editorButton = createIconButton('fa-pen-to-square', t('hideEditor'), 'mpp-editor-button');
     const closeButton = createIconButton('fa-xmark', t('closePanel'), 'mpp-panel-close');
+    let windowMode = localStorage.getItem(WINDOW_MODE_KEY) === 'tall' ? 'tall' : 'standard';
+    const renderWindowMode = () => {
+        const isTall = windowMode === 'tall';
+        panel.dataset.mppWindowMode = windowMode;
+        const label = t(isTall ? 'reduceWindow' : 'expandWindow');
+        windowModeButton.title = label;
+        windowModeButton.setAttribute('aria-label', label);
+        windowModeButton.setAttribute('aria-pressed', String(isTall));
+        windowModeButton.querySelector('i')?.classList.toggle('fa-expand', !isTall);
+        windowModeButton.querySelector('i')?.classList.toggle('fa-compress', isTall);
+    };
+    windowModeButton.addEventListener('click', () => {
+        windowMode = windowMode === 'tall' ? 'standard' : 'tall';
+        localStorage.setItem(WINDOW_MODE_KEY, windowMode);
+        renderWindowMode();
+    });
+    renderWindowMode();
     closeButton.addEventListener('click', () => {
         document.querySelector('#persona-management-button .drawer-toggle')?.click();
     });
-    actions.append(settingsButton, editorButton, closeButton);
+    actions.append(windowModeButton, settingsButton, editorButton, closeButton);
     hero.append(brand, actions);
     return { hero, settingsButton, editorButton };
+}
+
+function setupDesktopDimmer(panel) {
+    const dimmer = createElement('div', 'mpp-page-dimmer');
+    dimmer.setAttribute('aria-hidden', 'true');
+    if (panel.parentElement) panel.parentElement.insertBefore(dimmer, panel);
+    else document.body.appendChild(dimmer);
+    const desktopQuery = window.matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)');
+    const update = () => {
+        dimmer.classList.toggle('is-visible', desktopQuery.matches && panel.classList.contains('openDrawer'));
+    };
+    dimmer.addEventListener('click', () => {
+        document.querySelector('#persona-management-button .drawer-toggle')?.click();
+    });
+    new MutationObserver(update).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    desktopQuery.addEventListener?.('change', update);
+    update();
 }
 
 function createSpotlight(panel, editorButton) {
@@ -468,6 +557,38 @@ function createSpotlight(panel, editorButton) {
     const hint = createElement('span', '', t('noSelection'));
     copy.append(kicker, name, hint);
 
+    const cropButton = createIconButton('fa-crop-simple', t('cropPortrait'), 'mpp-spotlight-crop-button');
+    cropButton.setAttribute('aria-expanded', 'false');
+    const cropPanel = createElement('section', 'mpp-crop-panel');
+    cropPanel.hidden = true;
+    const cropHeader = createElement('header', 'mpp-crop-header');
+    cropHeader.appendChild(createElement('strong', '', t('cropPortrait')));
+    const closeCropButton = createIconButton('fa-xmark', t('closeCrop'), 'mpp-crop-close');
+    cropHeader.appendChild(closeCropButton);
+
+    const cropControls = createElement('div', 'mpp-crop-controls');
+    const cropInputs = {};
+    const makeCropRange = (key, label, minimum, maximum) => {
+        const row = createElement('label', 'mpp-crop-row');
+        const labelText = createElement('span', '', label);
+        const input = createElement('input');
+        input.type = 'range';
+        input.min = String(minimum);
+        input.max = String(maximum);
+        input.step = '1';
+        const output = createElement('output');
+        row.append(labelText, input, output);
+        cropControls.appendChild(row);
+        cropInputs[key] = { input, output };
+    };
+    makeCropRange('x', t('cropHorizontal'), 0, 100);
+    makeCropRange('y', t('cropVertical'), 0, 100);
+    makeCropRange('zoom', t('cropZoom'), 100, 200);
+    const resetCropButton = createElement('button', 'mpp-button mpp-crop-reset');
+    resetCropButton.type = 'button';
+    resetCropButton.append(createElement('i', 'fa-solid fa-arrow-rotate-left'), createElement('span', '', t('resetCrop')));
+    cropPanel.append(cropHeader, cropControls, resetCropButton);
+
     const openEditor = createElement('button', 'mpp-button mpp-spotlight-edit');
     openEditor.type = 'button';
     openEditor.append(createElement('i', 'fa-solid fa-pen-to-square'), createElement('span', '', t('showEditor')));
@@ -475,7 +596,45 @@ function createSpotlight(panel, editorButton) {
         if (panel.classList.contains('mpp-editor-collapsed')) editorButton.click();
         panel.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-    spotlight.append(portrait, copy, openEditor);
+    spotlight.append(portrait, copy, cropButton, openEditor, cropPanel);
+
+    let currentAvatarId = '';
+    const applyCrop = crop => {
+        image.style.setProperty('--mpp-crop-x', `${crop.x}%`);
+        image.style.setProperty('--mpp-crop-y', `${crop.y}%`);
+        image.style.setProperty('--mpp-crop-zoom', String(crop.zoom / 100));
+        Object.entries(cropInputs).forEach(([key, elements]) => {
+            const value = crop[key];
+            elements.input.value = String(value);
+            elements.output.textContent = key === 'zoom' ? `${value}%` : String(value);
+        });
+    };
+    const readCropControls = () => ({
+        x: Number(cropInputs.x.input.value),
+        y: Number(cropInputs.y.input.value),
+        zoom: Number(cropInputs.zoom.input.value),
+    });
+    const setCropPanelOpen = open => {
+        cropPanel.hidden = !open;
+        cropButton.classList.toggle('is-active', open);
+        cropButton.setAttribute('aria-expanded', String(open));
+    };
+    cropButton.addEventListener('click', () => setCropPanelOpen(cropPanel.hidden));
+    closeCropButton.addEventListener('click', () => setCropPanelOpen(false));
+    cropPanel.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            setCropPanelOpen(false);
+            cropButton.focus();
+        }
+    });
+    Object.values(cropInputs).forEach(({ input }) => {
+        input.addEventListener('input', () => applyCrop(readCropControls()));
+        input.addEventListener('change', () => savePortraitCrop(currentAvatarId, readCropControls()));
+    });
+    resetCropButton.addEventListener('click', () => {
+        resetPortraitCrop(currentAvatarId);
+        applyCrop(getPortraitCrop(currentAvatarId));
+    });
 
     const update = () => {
         const selected = panel.querySelector('#user_avatar_block > .avatar-container.selected')
@@ -483,8 +642,11 @@ function createSpotlight(panel, editorButton) {
         const selectedImage = selected?.querySelector('.avatar img');
         const selectedName = panel.querySelector('#your_name')?.textContent?.trim()
             || selected?.querySelector('.ch_name')?.textContent?.trim();
+        currentAvatarId = selected ? getCardAvatarId(selected) : '';
         image.src = selectedImage?.src || '';
         portrait.hidden = !selectedImage?.src;
+        cropButton.hidden = !selectedImage?.src || !currentAvatarId;
+        applyCrop(getPortraitCrop(currentAvatarId));
         name.textContent = selectedName || t('noSelection');
         hint.textContent = selected?.classList.contains('default_persona')
             ? t('default')
@@ -793,6 +955,7 @@ function enhancePanel(panel) {
     const { hero, settingsButton, editorButton } = createHero(panel, nativeHeader);
     const appearance = createAppearancePanel(panel, settingsButton);
     const { spotlight, update: updateSpotlight } = createSpotlight(panel, editorButton);
+    setupDesktopDimmer(panel);
     nativeHeader.hidden = true;
     shell.prepend(hero, appearance, spotlight);
 

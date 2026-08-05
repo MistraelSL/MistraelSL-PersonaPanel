@@ -96,6 +96,24 @@
     font: inherit;
 }
 
+.mpp-page-dimmer {
+    position: fixed;
+    z-index: 11998;
+    inset: 0;
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+    background: rgba(4, 5, 9, 0.68);
+    transition: opacity 170ms ease, visibility 0s linear 170ms;
+}
+
+.mpp-page-dimmer.is-visible {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    transition-delay: 0s;
+}
+
 /* Header */
 .mpp-hero {
     display: flex;
@@ -172,6 +190,11 @@
     white-space: nowrap;
 }
 
+.mpp-brand-attribution,
+#PersonaManagement.mpp-panel .mpp-window-mode-button {
+    display: none;
+}
+
 .mpp-title-row a,
 .mpp-title-row a:hover {
     color: var(--mpp-muted);
@@ -242,6 +265,8 @@
 
 /* Current-persona spotlight */
 .mpp-spotlight {
+    position: relative;
+    z-index: 10;
     display: grid;
     flex: 0 0 auto;
     min-width: 0;
@@ -280,6 +305,38 @@
     object-fit: cover;
     object-position: center top;
 }
+
+#PersonaManagement.mpp-panel .mpp-spotlight-crop-button {
+    display: none;
+}
+
+.mpp-crop-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 7px);
+    left: 7px;
+    display: grid;
+    width: min(390px, calc(100% - 14px));
+    padding: 12px;
+    gap: 10px;
+    color: var(--mpp-text);
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 42%, var(--mpp-border));
+    border-radius: 15px;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--mpp-accent) 9%, transparent), transparent 56%),
+        color-mix(in srgb, var(--mpp-tint) 96%, #0b0b10);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.mpp-crop-panel[hidden] { display: none !important; }
+.mpp-crop-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mpp-crop-header strong { font-size: calc(0.84rem + var(--mpp-font-adjust)); }
+#PersonaManagement.mpp-panel .mpp-crop-close { width: 30px; min-width: 30px; min-height: 30px; padding: 0; }
+.mpp-crop-controls { display: grid; gap: 9px; }
+.mpp-crop-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.25fr) 42px; align-items: center; gap: 8px; color: var(--mpp-muted); font-size: calc(0.7rem + var(--mpp-font-adjust)); }
+.mpp-crop-row input { width: 100%; accent-color: var(--mpp-accent); }
+.mpp-crop-row output { color: var(--mpp-text); font-variant-numeric: tabular-nums; text-align: right; }
+#PersonaManagement.mpp-panel .mpp-crop-reset { width: max-content; min-height: 31px; padding-inline: 10px; justify-self: end; }
 
 .mpp-spotlight-copy {
     gap: 1px;
@@ -1193,6 +1250,124 @@
     #PersonaManagement.mpp-panel #persona_grid_toggle { display: none; }
     #PersonaManagement.mpp-panel #persona_connections_buttons { grid-template-columns: 1fr; }
     .mpp-filter { padding-inline: 8px; }
+}
+
+/* Desktop/laptop presentation. Coarse-pointer tablets keep the native drawer layout. */
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+    #PersonaManagement.mpp-panel {
+        --mpp-panel-height: min(760px, calc(100dvh - 96px));
+
+        position: fixed !important;
+        z-index: 11999 !important;
+        top: 50% !important;
+        right: auto !important;
+        bottom: auto !important;
+        left: 50% !important;
+        width: min(var(--sheldWidth), calc(100dvw - 64px)) !important;
+        min-width: min(760px, calc(100dvw - 64px));
+        max-width: calc(100dvw - 64px) !important;
+        margin: 0 !important;
+        border-radius: 24px;
+        transform: translate(-50%, calc(-50% - 14px)) scale(0.992);
+        transform-origin: center;
+    }
+
+    #PersonaManagement.mpp-panel[data-mpp-window-mode='tall'] {
+        --mpp-panel-height: calc(100dvh - 28px);
+    }
+
+    #PersonaManagement.mpp-panel.openDrawer {
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    #PersonaManagement.mpp-panel > .flex-container {
+        padding: 14px 16px 16px;
+    }
+
+    .mpp-hero {
+        position: relative;
+        display: grid;
+        min-height: 48px;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        justify-content: stretch;
+    }
+
+    .mpp-brand {
+        position: static;
+        max-width: min(390px, 42dvw);
+        grid-column: 2;
+        text-align: center;
+    }
+
+    .mpp-brand-copy { align-items: center; }
+    .mpp-title-row { justify-content: center; }
+    .mpp-brand-attribution { display: inline; color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text)); font-weight: 650; }
+    .mpp-hero-actions { position: relative; z-index: 2; grid-column: 3; justify-self: end; }
+    #PersonaManagement.mpp-panel .mpp-window-mode-button { display: inline-flex; }
+
+    .mpp-spotlight {
+        min-height: 88px;
+        padding: 7px 12px 7px 7px;
+        grid-template-columns: clamp(190px, 25cqi, 280px) minmax(0, 1fr);
+        gap: 4px;
+        overflow: visible;
+        border-radius: 17px;
+    }
+
+    .mpp-spotlight-portrait {
+        position: relative;
+        width: 100%;
+        height: 72px;
+        border: 0;
+        border-radius: 13px 0 0 13px;
+        box-shadow: none;
+        isolation: isolate;
+    }
+
+    .mpp-spotlight-portrait::after {
+        content: '';
+        position: absolute;
+        z-index: 2;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(to right, transparent 48%, color-mix(in srgb, var(--mpp-glass-strong) 96%, transparent) 100%);
+    }
+
+    .mpp-spotlight-portrait img {
+        --mpp-crop-x: 50%;
+        --mpp-crop-y: 22%;
+        --mpp-crop-zoom: 1;
+
+        position: relative;
+        z-index: 1;
+        object-position: var(--mpp-crop-x) var(--mpp-crop-y);
+        transform: scale(var(--mpp-crop-zoom));
+        transform-origin: var(--mpp-crop-x) var(--mpp-crop-y);
+        image-rendering: auto;
+    }
+
+    .mpp-spotlight-copy {
+        position: relative;
+        z-index: 3;
+        padding-left: 8px;
+        align-self: center;
+        gap: 3px;
+    }
+
+    .mpp-spotlight-copy strong { font-size: calc(1.02rem + var(--mpp-font-adjust)); }
+    #PersonaManagement.mpp-panel .mpp-spotlight-crop-button {
+        position: absolute;
+        z-index: 5;
+        bottom: 12px;
+        left: 12px;
+        display: inline-flex;
+        width: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        padding: 0;
+        border-radius: 9px;
+        background: color-mix(in srgb, var(--mpp-tint) 88%, transparent);
+    }
 }
 
 @media (hover: none), (pointer: coarse) {
