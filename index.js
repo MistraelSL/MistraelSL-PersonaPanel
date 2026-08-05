@@ -600,8 +600,8 @@ function createSpotlight(panel, editorButton) {
 
     let currentAvatarId = '';
     const applyCrop = crop => {
-        image.style.setProperty('--mpp-crop-x', `${crop.x}%`);
-        image.style.setProperty('--mpp-crop-y', `${crop.y}%`);
+        image.style.setProperty('--mpp-crop-shift-x', `${(50 - crop.x) * 0.28}%`);
+        image.style.setProperty('--mpp-crop-shift-y', `${(50 - crop.y) * 0.4}%`);
         image.style.setProperty('--mpp-crop-zoom', String(crop.zoom / 100));
         Object.entries(cropInputs).forEach(([key, elements]) => {
             const value = crop[key];
