@@ -1426,10 +1426,14 @@
     .mpp-spotlight {
         min-height: 112px;
         padding: 8px 16px 8px 8px;
-        grid-template-columns: clamp(260px, 36cqi, 430px) minmax(36px, 1fr) minmax(230px, 300px);
-        gap: 4px;
+        grid-template-columns: clamp(260px, 36cqi, 430px) minmax(230px, 1fr);
+        gap: clamp(24px, 4cqi, 64px);
         overflow: visible;
         border-radius: 17px;
+        background:
+            linear-gradient(105deg, color-mix(in srgb, var(--mpp-accent) 13%, transparent), transparent 48%),
+            linear-gradient(270deg, color-mix(in srgb, var(--mpp-accent) 7%, transparent), transparent 44%),
+            color-mix(in srgb, var(--mpp-glass-strong) 88%, transparent);
     }
 
     .mpp-spotlight-portrait {
@@ -1462,16 +1466,57 @@
     .mpp-spotlight-copy {
         position: relative;
         z-index: 3;
-        width: min(100%, 280px);
-        padding-left: 0;
-        grid-column: 3;
+        width: min(100%, 430px);
+        padding: 7px 16px 7px 20px;
+        grid-column: 2;
         align-self: center;
-        justify-self: end;
-        gap: 3px;
+        justify-self: start;
+        gap: 6px;
         text-align: left;
+        border-left: 2px solid color-mix(in srgb, var(--mpp-accent) 46%, transparent);
     }
 
-    .mpp-spotlight-copy strong { font-size: calc(1.02rem + var(--mpp-font-adjust)); }
+    .mpp-spotlight-copy small {
+        font-size: calc(0.67rem + var(--mpp-font-adjust));
+        letter-spacing: 0.095em;
+    }
+
+    .mpp-spotlight-copy strong {
+        font-size: calc(clamp(1.35rem, 2.35cqi, 1.9rem) + var(--mpp-font-adjust));
+        font-weight: 760;
+        line-height: 1.05;
+        letter-spacing: -0.025em;
+    }
+
+    .mpp-spotlight-copy > span {
+        display: inline-flex;
+        width: max-content;
+        max-width: 100%;
+        min-height: 24px;
+        padding: 4px 10px;
+        align-items: center;
+        gap: 7px;
+        color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text));
+        font-size: calc(0.66rem + var(--mpp-font-adjust));
+        font-weight: 650;
+        line-height: 1;
+        border: 1px solid color-mix(in srgb, var(--mpp-accent) 34%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--mpp-accent) 10%, transparent);
+    }
+
+    .mpp-spotlight-copy > span::before {
+        content: '';
+        flex: 0 0 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    #PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-spotlight-copy > span {
+        color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text)) !important;
+    }
     #PersonaManagement.mpp-panel :is(.mpp-spotlight-visual-crop-button, .mpp-spotlight-crop-button) {
         position: absolute;
         z-index: 5;

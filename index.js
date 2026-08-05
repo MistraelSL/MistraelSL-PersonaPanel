@@ -55,7 +55,6 @@ const THEMES = Object.freeze({
 const I18N = {
     en: {
         title: 'Persona Panel',
-        subtitle: 'Your personas, naturally inside SillyTavern',
         library: 'Persona library',
         personaOne: 'persona',
         personaFew: 'personas',
@@ -118,7 +117,6 @@ const I18N = {
     },
     ru: {
         title: 'Панель персон',
-        subtitle: 'Ваши персоны — естественная часть SillyTavern',
         library: 'Библиотека персон',
         personaOne: 'персона',
         personaFew: 'персоны',
@@ -523,7 +521,7 @@ function createHero(panel, nativeHeader) {
     titleRow.appendChild(title);
     const nativeDocsLink = nativeHeader.querySelector('h3 a');
     if (nativeDocsLink) titleRow.appendChild(nativeDocsLink);
-    brandCopy.append(titleRow, createElement('small', '', t('subtitle')));
+    brandCopy.appendChild(titleRow);
     brand.append(icon, brandCopy);
 
     const actions = createElement('div', 'mpp-hero-actions');
