@@ -844,19 +844,33 @@ function enhancePanel(panel) {
     refreshPersonaCount(personaCounter);
 
     let updateQueued = false;
+    let pendingCardsChanged = false;
     let countTimer;
-    const avatarObserver = new MutationObserver(() => {
+    const avatarObserver = new MutationObserver(mutations => {
+        const cardsChanged = mutations.some(mutation =>
+            mutation.type === 'childList' && mutation.target === avatarBlock);
+        const cardStateChanged = mutations.some(mutation =>
+            mutation.type === 'attributes'
+            && mutation.target instanceof HTMLElement
+            && mutation.target.parentElement === avatarBlock);
+        if (!cardsChanged && !cardStateChanged) return;
+        pendingCardsChanged ||= cardsChanged;
+
         if (!updateQueued) {
             updateQueued = true;
             requestAnimationFrame(() => {
                 updateQueued = false;
-                decorateCards(avatarBlock);
+                const shouldDecorate = pendingCardsChanged;
+                pendingCardsChanged = false;
+                if (shouldDecorate) decorateCards(avatarBlock);
                 applyFilter();
                 updateSpotlight();
             });
         }
-        window.clearTimeout(countTimer);
-        countTimer = window.setTimeout(() => refreshPersonaCount(personaCounter), 250);
+        if (cardsChanged) {
+            window.clearTimeout(countTimer);
+            countTimer = window.setTimeout(() => refreshPersonaCount(personaCounter), 250);
+        }
     });
     avatarObserver.observe(avatarBlock, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
@@ -875,12 +889,19 @@ function scan(node = document) {
 }
 
 function init() {
-    scan();
-    new MutationObserver(mutations => {
+    const existingPanel = document.querySelector(PANEL_SELECTOR);
+    if (existingPanel) {
+        enhancePanel(existingPanel);
+        return;
+    }
+
+    const panelObserver = new MutationObserver(mutations => {
         mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
             if (node instanceof Element) scan(node);
         }));
-    }).observe(document.body, { childList: true, subtree: true });
+        if (document.querySelector(`${PANEL_SELECTOR}[data-mpp-enhanced='true']`)) panelObserver.disconnect();
+    });
+    panelObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 if (document.readyState === 'loading') {
