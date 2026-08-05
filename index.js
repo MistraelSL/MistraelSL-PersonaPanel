@@ -1,6 +1,7 @@
 import { getUserAvatars, initPersona, isPersonaLocked, setUserAvatar, togglePersonaLock } from '../../../personas.js';
 import { power_user } from '../../../power-user.js';
 import { world_names } from '../../../world-info.js';
+import { POPUP_TYPE, Popup } from '../../../popup.js';
 
 const EXTENSION_NAME = 'MistraelSL Persona Panel';
 const PANEL_SELECTOR = '#PersonaManagement';
@@ -1407,6 +1408,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         busy: false,
         file: null,
         objectUrl: '',
+        cropData: null,
         previousWindowMode: 'standard',
         locks: new Set(),
     };
@@ -1512,13 +1514,14 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             updateSpotlight();
         }
     };
-    const uploadPortrait = async (avatarId, file) => {
+    const uploadPortrait = async (avatarId, file, cropData = null) => {
         const ctx = context();
         if (!ctx?.getRequestHeaders) throw new Error('SillyTavern request context is unavailable.');
         const form = new FormData();
         form.append('avatar', file, 'avatar.png');
         form.append('overwrite_name', avatarId);
-        const response = await fetch('/api/avatars/upload', {
+        const cropQuery = cropData ? `?crop=${encodeURIComponent(JSON.stringify(cropData))}` : '';
+        const response = await fetch(`/api/avatars/upload${cropQuery}`, {
             method: 'POST',
             headers: ctx.getRequestHeaders({ omitContentType: true }),
             cache: 'no-cache',
@@ -1526,28 +1529,31 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         });
         if (!response.ok) throw new Error(`Avatar upload failed (${response.status}).`);
     };
-    const openNativeAvatarPicker = (avatarId, file = null) => {
-        const nativeInput = document.querySelector('#avatar_upload_file');
-        const overwriteInput = document.querySelector('#avatar_upload_overwrite');
-        if (!(nativeInput instanceof HTMLInputElement) || !(overwriteInput instanceof HTMLInputElement)) return false;
-        overwriteInput.value = avatarId;
-        if (file) {
-            const transfer = new DataTransfer();
-            transfer.items.add(file);
-            nativeInput.files = transfer.files;
-            nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
-            return true;
+    const readFileAsDataUrl = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => resolve(String(reader.result || '')), { once: true });
+        reader.addEventListener('error', () => reject(reader.error || new Error('Could not read image.')), { once: true });
+        reader.readAsDataURL(file);
+    });
+    const preparePortrait = async file => {
+        let previewSource = '';
+        let cropData = null;
+        if (!power_user.never_resize_avatars) {
+            const source = await readFileAsDataUrl(file);
+            const popup = new Popup(t('creatorCropPhoto'), POPUP_TYPE.CROP, '', { cropImage: source });
+            const croppedImage = await popup.show();
+            if (!croppedImage) return false;
+            cropData = popup.cropData ?? null;
+            previewSource = String(croppedImage);
         }
-        nativeInput.addEventListener('change', () => {
-            const selectedFile = nativeInput.files?.[0];
-            if (!selectedFile) return;
-            if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-            state.objectUrl = URL.createObjectURL(selectedFile);
-            photoImage.src = state.objectUrl;
-            photoImage.hidden = false;
-            photoEmpty.hidden = true;
-        }, { once: true, capture: true });
-        nativeInput.click();
+        state.file = file;
+        state.cropData = cropData;
+        photoButton.classList.remove('has-error');
+        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+        state.objectUrl = previewSource.startsWith('data:') ? '' : URL.createObjectURL(file);
+        photoImage.src = previewSource.startsWith('data:') ? previewSource : state.objectUrl;
+        photoImage.hidden = false;
+        photoEmpty.hidden = true;
         return true;
     };
     const applyLocks = async () => {
@@ -1561,6 +1567,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         state.avatarId = '';
         state.busy = false;
         state.file = null;
+        state.cropData = null;
         state.locks.clear();
         if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
         state.objectUrl = '';
@@ -1646,21 +1653,25 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     }, { capture: true });
     panel.mppOpenPersonaEditor = openExisting;
     backButton.addEventListener('click', close);
-    photoButton.addEventListener('click', () => {
-        if (state.avatarId && openNativeAvatarPicker(state.avatarId)) return;
-        photoInput.click();
-    });
+    photoButton.addEventListener('click', () => photoInput.click());
     photoInput.addEventListener('change', async () => {
         const file = photoInput.files?.[0];
         photoInput.value = '';
         if (!file) return;
-        state.file = file;
-        photoButton.classList.remove('has-error');
-        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-        state.objectUrl = URL.createObjectURL(file);
-        photoImage.src = state.objectUrl;
-        photoImage.hidden = false;
-        photoEmpty.hidden = true;
+        try {
+            if (!(await preparePortrait(file))) return;
+            if (state.avatarId) {
+                await uploadPortrait(state.avatarId, state.file, state.cropData);
+                await getUserAvatars(true, state.avatarId);
+                await setUserAvatar(state.avatarId);
+                state.file = null;
+                state.cropData = null;
+                updateSpotlight();
+            }
+        } catch (error) {
+            console.error(`[${EXTENSION_NAME}] Could not prepare persona portrait.`, error);
+            notify(t('creatorError'));
+        }
     });
     renameButton.addEventListener('click', () => nameInput.hidden ? startNameEdit() : finishNameEdit());
     nameInput.addEventListener('keydown', event => {
@@ -1738,7 +1749,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
                 });
                 state.avatarId = avatarId;
                 power_user.persona_descriptions[avatarId].connections = [];
-                await uploadPortrait(avatarId, state.file);
+                await uploadPortrait(avatarId, state.file, state.cropData);
             } else {
                 power_user.personas[avatarId] = name;
                 updateDescriptor();
@@ -1748,8 +1759,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             await setUserAvatar(avatarId);
             await applyLocks();
             writeNotes();
-            if (isNew && state.file) openNativeAvatarPicker(avatarId, state.file);
             state.file = null;
+            state.cropData = null;
             workspace.classList.add('is-saved');
             saveButton.querySelector('span').textContent = t(isNew ? 'creatorSaved' : 'creatorChangesSaved');
             saveButton.querySelector('i').className = 'fa-solid fa-circle-check';
