@@ -531,8 +531,9 @@ function createHero(panel, nativeHeader) {
         actions.appendChild(nativeActions);
     }
     const windowModeButton = createIconButton('fa-expand', t('expandWindow'), 'mpp-window-mode-button');
-    const settingsButton = createIconButton('fa-gear', t('appearance'), 'mpp-settings-button');
+    const settingsButton = createIconButton('fa-paintbrush', t('appearance'), 'mpp-settings-button');
     const editorButton = createIconButton('fa-pen-to-square', t('hideEditor'), 'mpp-editor-button');
+    editorButton.hidden = true;
     const closeButton = createIconButton('fa-xmark', t('closePanel'), 'mpp-panel-close');
     let windowMode = localStorage.getItem(WINDOW_MODE_KEY) === 'tall' ? 'tall' : 'standard';
     const renderWindowMode = () => {
