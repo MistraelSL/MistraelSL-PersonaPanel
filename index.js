@@ -1205,8 +1205,8 @@ function enhancePanel(panel) {
     const libraryTitle = createElement('h3', '', t('library'));
     const personaCounter = createElement('span', 'mpp-persona-counter', t('loading'));
     const desktopLibraryLayout = window.matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
+    libraryTitle.append(document.createTextNode(': '), personaCounter);
     libraryCopy.appendChild(libraryTitle);
-    if (!desktopLibraryLayout) libraryCopy.appendChild(personaCounter);
     const densityControls = createDensityControls(avatarBlock);
     libraryHeader.append(libraryCopy, densityControls);
     leftColumn.prepend(libraryHeader);
@@ -1214,7 +1214,6 @@ function enhancePanel(panel) {
     if (desktopLibraryLayout && nativeToolbar) {
         const createButton = nativeToolbar.querySelector(':scope > .menu_button:not(#persona_grid_toggle), :scope > button:not(#persona_grid_toggle)');
         const searchInput = nativeToolbar.querySelector('input[type="search"], input[type="text"]');
-        nativeToolbar.prepend(personaCounter);
         if (searchInput) searchInput.placeholder = t('searchByPersonaName');
         if (createButton) {
             createButton.classList.add('mpp-create-persona');

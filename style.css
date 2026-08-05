@@ -725,8 +725,9 @@
 
 .mpp-persona-counter {
     padding: 0;
-    color: var(--mpp-muted);
-    font-size: calc(0.62rem + var(--mpp-font-adjust));
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
     border: 0;
     background: transparent;
     white-space: nowrap;
@@ -815,11 +816,6 @@
 
 #PersonaManagement.mpp-panel .mpp-library-toolbar input::placeholder { color: var(--mpp-muted); }
 
-#PersonaManagement.mpp-panel .mpp-library-toolbar > .mpp-persona-counter {
-    padding-inline: 4px;
-    font-size: calc(0.68rem + var(--mpp-font-adjust));
-}
-
 #PersonaManagement.mpp-panel #persona_pagination_container {
     min-width: 0;
     grid-column: 1 / -1;
@@ -849,9 +845,9 @@
     display: inline-flex;
     flex: 0 0 auto;
     min-width: max-content;
-    min-height: 30px;
+    min-height: 36px;
     margin: 0 0 0 auto !important;
-    padding: 5px 12px;
+    padding: 7px 16px;
     align-items: center;
     justify-content: center;
     gap: 6px;
@@ -859,6 +855,8 @@
     border: 1px solid color-mix(in srgb, var(--mpp-accent) 45%, var(--mpp-border));
     border-radius: 999px;
     background: color-mix(in srgb, var(--mpp-accent) 12%, rgba(255, 255, 255, 0.035));
+    font-size: calc(0.76rem + var(--mpp-font-adjust));
+    font-weight: 650;
     filter: none;
 }
 
@@ -1400,6 +1398,10 @@
 
 /* Desktop/laptop presentation. Coarse-pointer tablets keep the native drawer layout. */
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+    .mpp-library-toolbar {
+        grid-template-columns: minmax(160px, 1fr) auto;
+    }
+
     #PersonaManagement.mpp-panel {
         --mpp-panel-height: min(760px, calc(100dvh - 96px));
 
