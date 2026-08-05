@@ -1,5 +1,6 @@
-import { getUserAvatars, setUserAvatar } from '../../../personas.js';
+import { getUserAvatars, isPersonaLocked, setUserAvatar, togglePersonaLock } from '../../../personas.js';
 import { power_user } from '../../../power-user.js';
+import { world_names } from '../../../world-info.js';
 
 const EXTENSION_NAME = 'MistraelSL Persona Panel';
 const PANEL_SELECTOR = '#PersonaManagement';
@@ -11,6 +12,7 @@ const MOBILE_COLUMNS_KEY = 'MistraelSL_PersonaPanel_mobileColumns';
 const FAVORITES_KEY = 'MistraelSL_PersonaPanel_favorites';
 const WINDOW_MODE_KEY = 'MistraelSL_PersonaPanel_windowMode';
 const PORTRAIT_CROP_KEY = 'MistraelSL_PersonaPanel_portraitCrop_v2';
+const PERSONA_NOTES_KEY = 'MistraelSL_PersonaPanel_privateNotes_v1';
 
 const DEFAULT_APPEARANCE = Object.freeze({
     theme: 'native',
@@ -115,6 +117,38 @@ const I18N = {
         cropZoom: 'Zoom',
         resetCrop: 'Reset framing',
         closeCrop: 'Close framing settings',
+        createWorkspace: 'Create persona',
+        creatorBack: 'Back to persona library',
+        creatorName: 'Name me',
+        creatorRename: 'Name the persona',
+        creatorPhoto: 'Choose persona portrait',
+        creatorPhotoRequired: 'Choose a portrait before creating the persona.',
+        creatorNameRequired: 'Give the persona a name first.',
+        creatorSave: 'Create persona',
+        creatorSaving: 'Creating…',
+        creatorSaved: 'Persona created',
+        creatorError: 'Could not create the persona.',
+        creatorDescription: 'Description',
+        creatorExpandDescription: 'Expand description',
+        creatorPosition: 'Position',
+        creatorConnections: 'Connections',
+        creatorLorebook: 'Lorebook',
+        creatorNotes: 'Private notes',
+        creatorNotesHint: 'These notes are visible only here and are not sent to the model.',
+        creatorNone: 'None (disabled)',
+        creatorInPrompt: 'In Story String / Prompt',
+        creatorTopAn: "Top of Author's Note",
+        creatorBottomAn: "Bottom of Author's Note",
+        creatorAtDepth: 'In-chat @ Depth',
+        creatorDepth: 'Depth',
+        creatorRole: 'Role',
+        creatorSystem: 'System',
+        creatorUser: 'User',
+        creatorAssistant: 'Assistant',
+        creatorDefault: 'Default',
+        creatorCharacter: 'Character',
+        creatorChat: 'Chat',
+        creatorNoLorebook: 'No lorebook',
     },
     ru: {
         title: 'Панель персон',
@@ -139,6 +173,38 @@ const I18N = {
         glass: 'Видимость стекла',
         font: 'Размер текста',
         reset: 'Сбросить оформление',
+        createWorkspace: 'Создание персоны',
+        creatorBack: 'Назад к библиотеке персон',
+        creatorName: 'Назови меня',
+        creatorRename: 'Назвать персону',
+        creatorPhoto: 'Выбрать фотографию персоны',
+        creatorPhotoRequired: 'Сначала выберите фотографию персоны.',
+        creatorNameRequired: 'Сначала назовите персону.',
+        creatorSave: 'Создать персону',
+        creatorSaving: 'Создаю…',
+        creatorSaved: 'Персона создана',
+        creatorError: 'Не удалось создать персону.',
+        creatorDescription: 'Описание',
+        creatorExpandDescription: 'Увеличить описание',
+        creatorPosition: 'Позиция',
+        creatorConnections: 'Связь',
+        creatorLorebook: 'Лорбук',
+        creatorNotes: 'Личные заметки',
+        creatorNotesHint: 'Заметки видны только здесь и не отправляются модели.',
+        creatorNone: 'Нигде (отключено)',
+        creatorInPrompt: 'В строке истории / промпте',
+        creatorTopAn: 'Вверху заметок автора',
+        creatorBottomAn: 'Внизу заметок автора',
+        creatorAtDepth: 'В чате на глубине',
+        creatorDepth: 'Глубина',
+        creatorRole: 'Роль',
+        creatorSystem: 'Система',
+        creatorUser: 'Пользователь',
+        creatorAssistant: 'Ассистент',
+        creatorDefault: 'По умолчанию',
+        creatorCharacter: 'Персонаж',
+        creatorChat: 'Чат',
+        creatorNoLorebook: 'Без лорбука',
         close: 'Закрыть настройки внешнего вида',
         expand: 'Развернуть раздел',
         collapse: 'Свернуть раздел',
@@ -1172,6 +1238,435 @@ async function refreshPersonaCount(counter) {
     }
 }
 
+function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotlight) {
+    if (!createButton) return null;
+
+    const workspace = createElement('section', 'mpp-creator');
+    workspace.hidden = true;
+    workspace.setAttribute('aria-label', t('createWorkspace'));
+
+    const top = createElement('header', 'mpp-creator-top');
+    const backButton = createElement('button', 'mpp-button mpp-creator-back');
+    backButton.type = 'button';
+    backButton.append(createElement('i', 'fa-solid fa-arrow-left'), createElement('span', '', t('creatorBack')));
+    const saveButton = createElement('button', 'mpp-button mpp-creator-save');
+    saveButton.type = 'button';
+    saveButton.append(createElement('i', 'fa-solid fa-check'), createElement('span', '', t('creatorSave')));
+    top.append(backButton, saveButton);
+
+    const body = createElement('div', 'mpp-creator-body');
+    const left = createElement('aside', 'mpp-creator-left');
+    const photoButton = createElement('button', 'mpp-creator-photo');
+    photoButton.type = 'button';
+    photoButton.setAttribute('aria-label', t('creatorPhoto'));
+    const photoImage = createElement('img');
+    photoImage.alt = '';
+    photoImage.hidden = true;
+    const photoEmpty = createElement('span', 'mpp-creator-photo-empty');
+    photoEmpty.append(createElement('i', 'fa-regular fa-image'), createElement('strong', '', t('creatorPhoto')));
+    const photoInput = createElement('input');
+    photoInput.type = 'file';
+    photoInput.accept = 'image/*';
+    photoInput.hidden = true;
+    photoButton.append(photoImage, photoEmpty);
+
+    const toolNav = createElement('nav', 'mpp-creator-tools');
+    const toolDefinitions = [
+        ['position', 'fa-location-dot', t('creatorPosition')],
+        ['connections', 'fa-link', t('creatorConnections')],
+        ['lorebook', 'fa-book-open', t('creatorLorebook')],
+    ];
+    const toolButtons = new Map();
+    toolDefinitions.forEach(([key, icon, label]) => {
+        const button = createElement('button', 'mpp-creator-tool');
+        button.type = 'button';
+        button.dataset.creatorTool = key;
+        button.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', label));
+        toolButtons.set(key, button);
+        toolNav.appendChild(button);
+    });
+    left.append(photoButton, photoInput, toolNav);
+
+    const right = createElement('div', 'mpp-creator-right');
+    const identity = createElement('header', 'mpp-creator-identity');
+    const identityCopy = createElement('span', 'mpp-creator-identity-copy');
+    const nameDisplay = createElement('strong', 'mpp-creator-name', t('creatorName'));
+    const nameInput = createElement('input', 'mpp-creator-name-input');
+    nameInput.type = 'text';
+    nameInput.maxLength = 120;
+    nameInput.placeholder = t('creatorName');
+    nameInput.hidden = true;
+    identityCopy.append(nameDisplay, nameInput);
+    const renameButton = createIconButton('fa-pencil', t('creatorRename'), 'mpp-creator-rename');
+    identity.append(identityCopy, renameButton);
+
+    const descriptionField = createElement('section', 'mpp-creator-field mpp-creator-description');
+    const descriptionHead = createElement('header', 'mpp-creator-field-head');
+    descriptionHead.appendChild(createElement('strong', '', t('creatorDescription')));
+    const expandDescription = createIconButton('fa-expand', t('creatorExpandDescription'), 'mpp-creator-description-expand');
+    descriptionHead.appendChild(expandDescription);
+    const description = createElement('textarea', 'text_pole mpp-creator-description-input');
+    description.rows = 12;
+    descriptionField.append(descriptionHead, description);
+
+    const toolStage = createElement('section', 'mpp-creator-tool-stage');
+    toolStage.hidden = true;
+
+    const positionPanel = createElement('div', 'mpp-creator-tool-panel');
+    positionPanel.dataset.creatorPanel = 'position';
+    const position = createElement('select', 'text_pole');
+    [
+        [0, t('creatorInPrompt')],
+        [2, t('creatorTopAn')],
+        [3, t('creatorBottomAn')],
+        [4, t('creatorAtDepth')],
+        [9, t('creatorNone')],
+    ].forEach(([value, label]) => position.appendChild(new Option(label, String(value))));
+    const depthRow = createElement('div', 'mpp-creator-depth-row');
+    const depthLabel = createElement('label');
+    depthLabel.append(createElement('span', '', t('creatorDepth')));
+    const depth = createElement('input', 'text_pole');
+    depth.type = 'number';
+    depth.min = '0';
+    depth.max = '9999';
+    depth.value = '2';
+    depthLabel.appendChild(depth);
+    const roleLabel = createElement('label');
+    roleLabel.append(createElement('span', '', t('creatorRole')));
+    const role = createElement('select', 'text_pole');
+    [[0, t('creatorSystem')], [1, t('creatorUser')], [2, t('creatorAssistant')]]
+        .forEach(([value, label]) => role.appendChild(new Option(label, String(value))));
+    roleLabel.appendChild(role);
+    depthRow.append(depthLabel, roleLabel);
+    positionPanel.append(position, depthRow);
+
+    const connectionsPanel = createElement('div', 'mpp-creator-tool-panel mpp-creator-connections');
+    connectionsPanel.dataset.creatorPanel = 'connections';
+    const connectionDefinitions = [
+        ['default', 'fa-crown', t('creatorDefault')],
+        ['character', 'fa-user-lock', t('creatorCharacter')],
+        ['chat', 'fa-comment', t('creatorChat')],
+    ];
+    const connectionButtons = new Map();
+    connectionDefinitions.forEach(([key, icon, label]) => {
+        const button = createElement('button', 'mpp-creator-connection');
+        button.type = 'button';
+        button.dataset.lockType = key;
+        button.setAttribute('aria-pressed', 'false');
+        button.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', label));
+        connectionButtons.set(key, button);
+        connectionsPanel.appendChild(button);
+    });
+
+    const lorebookPanel = createElement('div', 'mpp-creator-tool-panel');
+    lorebookPanel.dataset.creatorPanel = 'lorebook';
+    const lorebook = createElement('select', 'text_pole');
+    lorebookPanel.appendChild(lorebook);
+    toolStage.append(positionPanel, connectionsPanel, lorebookPanel);
+
+    const notesField = createElement('label', 'mpp-creator-field mpp-creator-notes');
+    const notesTitle = createElement('strong', '', t('creatorNotes'));
+    const notesHint = createElement('small', '', t('creatorNotesHint'));
+    const notes = createElement('textarea', 'text_pole');
+    notes.rows = 5;
+    notesField.append(notesTitle, notesHint, notes);
+    right.append(identity, descriptionField, toolStage, notesField);
+    body.append(left, right);
+    workspace.append(top, body);
+
+    const state = {
+        activeTool: '',
+        avatarId: '',
+        busy: false,
+        file: null,
+        objectUrl: '',
+        previousWindowMode: 'standard',
+        locks: new Set(),
+    };
+    let descriptionTimer;
+
+    const context = () => globalThis.SillyTavern?.getContext?.();
+    const notify = (message, type = 'error') => {
+        const toast = globalThis.toastr?.[type];
+        if (typeof toast === 'function') toast(message);
+        else console[type === 'error' ? 'error' : 'info'](`[${EXTENSION_NAME}] ${message}`);
+    };
+    const saveSettings = () => context()?.saveSettingsDebounced?.();
+    const descriptor = () => state.avatarId ? power_user.persona_descriptions?.[state.avatarId] : null;
+    const updateDescriptor = () => {
+        const value = descriptor();
+        if (!value) return;
+        value.description = description.value;
+        value.position = Number(position.value);
+        value.depth = Number(depth.value) || 0;
+        value.role = Number(role.value);
+        value.lorebook = lorebook.value;
+        saveSettings();
+    };
+    const writeNotes = () => {
+        if (!state.avatarId) return;
+        try {
+            const stored = JSON.parse(localStorage.getItem(PERSONA_NOTES_KEY) || '{}');
+            if (notes.value) stored[state.avatarId] = notes.value;
+            else delete stored[state.avatarId];
+            localStorage.setItem(PERSONA_NOTES_KEY, JSON.stringify(stored));
+        } catch (error) {
+            console.warn(`[${EXTENSION_NAME}] Could not save private persona notes.`, error);
+        }
+    };
+    const fillLorebooks = () => {
+        const selected = lorebook.value;
+        lorebook.replaceChildren(new Option(t('creatorNoLorebook'), ''));
+        for (const name of world_names || []) lorebook.appendChild(new Option(name, name));
+        lorebook.value = [...lorebook.options].some(option => option.value === selected) ? selected : '';
+    };
+    const renderPositionDetails = () => {
+        depthRow.hidden = Number(position.value) !== 4;
+    };
+    const renderActiveTool = () => {
+        workspace.dataset.creatorTool = state.activeTool;
+        toolStage.hidden = !state.activeTool;
+        toolButtons.forEach((button, key) => {
+            const active = key === state.activeTool;
+            button.hidden = Boolean(state.activeTool && !active);
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-expanded', String(active));
+        });
+        toolStage.querySelectorAll('[data-creator-panel]').forEach(element => {
+            element.hidden = element.dataset.creatorPanel !== state.activeTool;
+        });
+    };
+    const startNameEdit = () => {
+        nameDisplay.hidden = true;
+        nameInput.hidden = false;
+        nameInput.value = nameDisplay.textContent === t('creatorName') ? '' : nameDisplay.textContent;
+        requestAnimationFrame(() => nameInput.focus());
+    };
+    const finishNameEdit = () => {
+        const nextName = nameInput.value.trim();
+        nameInput.hidden = true;
+        nameDisplay.hidden = false;
+        nameDisplay.textContent = nextName || t('creatorName');
+        if (state.avatarId && nextName) {
+            power_user.personas[state.avatarId] = nextName;
+            context()?.setUserName?.(nextName);
+            saveSettings();
+            updateSpotlight();
+        }
+    };
+    const uploadPortrait = async (avatarId, file) => {
+        const ctx = context();
+        if (!ctx?.getRequestHeaders) throw new Error('SillyTavern request context is unavailable.');
+        const form = new FormData();
+        form.append('avatar', file, 'avatar.png');
+        form.append('overwrite_name', avatarId);
+        const response = await fetch('/api/avatars/upload', {
+            method: 'POST',
+            headers: ctx.getRequestHeaders({ omitContentType: true }),
+            cache: 'no-cache',
+            body: form,
+        });
+        if (!response.ok) throw new Error(`Avatar upload failed (${response.status}).`);
+    };
+    const applyLocks = async () => {
+        for (const type of connectionButtons.keys()) {
+            const desired = state.locks.has(type);
+            if (Boolean(isPersonaLocked(type)) !== desired) await togglePersonaLock(type);
+        }
+    };
+    const reset = () => {
+        state.activeTool = '';
+        state.avatarId = '';
+        state.busy = false;
+        state.file = null;
+        state.locks.clear();
+        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+        state.objectUrl = '';
+        photoImage.removeAttribute('src');
+        photoImage.hidden = true;
+        photoEmpty.hidden = false;
+        photoButton.classList.remove('has-error');
+        nameDisplay.textContent = t('creatorName');
+        nameDisplay.hidden = false;
+        nameInput.value = '';
+        nameInput.hidden = true;
+        description.value = '';
+        position.value = '0';
+        depth.value = '2';
+        role.value = '0';
+        notes.value = '';
+        fillLorebooks();
+        lorebook.value = '';
+        connectionButtons.forEach(button => {
+            button.classList.remove('is-active');
+            button.setAttribute('aria-pressed', 'false');
+        });
+        saveButton.disabled = false;
+        saveButton.querySelector('span').textContent = t('creatorSave');
+        saveButton.querySelector('i').className = 'fa-solid fa-check';
+        workspace.classList.remove('is-description-expanded', 'is-saved');
+        expandDescription.querySelector('i').className = 'fa-solid fa-expand';
+        renderPositionDetails();
+        renderActiveTool();
+    };
+    const open = () => {
+        reset();
+        state.previousWindowMode = panel.dataset.mppWindowMode || 'standard';
+        panel.dataset.mppWindowMode = 'tall';
+        panel.classList.add('mpp-creating');
+        workspace.hidden = false;
+        panel.querySelector('.mpp-appearance')?.setAttribute('hidden', '');
+    };
+    const close = () => {
+        if (state.busy) return;
+        workspace.hidden = true;
+        panel.classList.remove('mpp-creating');
+        panel.dataset.mppWindowMode = state.previousWindowMode;
+        reset();
+    };
+
+    createButton.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        open();
+    }, { capture: true });
+    backButton.addEventListener('click', close);
+    photoButton.addEventListener('click', () => photoInput.click());
+    photoInput.addEventListener('change', async () => {
+        const file = photoInput.files?.[0];
+        photoInput.value = '';
+        if (!file) return;
+        state.file = file;
+        photoButton.classList.remove('has-error');
+        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+        state.objectUrl = URL.createObjectURL(file);
+        photoImage.src = state.objectUrl;
+        photoImage.hidden = false;
+        photoEmpty.hidden = true;
+        if (state.avatarId) {
+            try {
+                await uploadPortrait(state.avatarId, file);
+                await setUserAvatar(state.avatarId);
+            } catch (error) {
+                console.error(`[${EXTENSION_NAME}]`, error);
+                notify(t('creatorError'));
+            }
+        }
+    });
+    renameButton.addEventListener('click', () => nameInput.hidden ? startNameEdit() : finishNameEdit());
+    nameInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            finishNameEdit();
+        }
+        if (event.key === 'Escape') {
+            nameInput.hidden = true;
+            nameDisplay.hidden = false;
+        }
+    });
+    nameInput.addEventListener('blur', finishNameEdit);
+    toolButtons.forEach((button, key) => button.addEventListener('click', () => {
+        state.activeTool = state.activeTool === key ? '' : key;
+        if (key === 'lorebook') fillLorebooks();
+        renderActiveTool();
+    }));
+    expandDescription.addEventListener('click', () => {
+        const expanded = workspace.classList.toggle('is-description-expanded');
+        expandDescription.querySelector('i').className = `fa-solid ${expanded ? 'fa-compress' : 'fa-expand'}`;
+    });
+    position.addEventListener('change', () => {
+        renderPositionDetails();
+        updateDescriptor();
+    });
+    depth.addEventListener('input', updateDescriptor);
+    role.addEventListener('change', updateDescriptor);
+    lorebook.addEventListener('change', updateDescriptor);
+    description.addEventListener('input', () => {
+        window.clearTimeout(descriptionTimer);
+        descriptionTimer = window.setTimeout(updateDescriptor, 250);
+    });
+    notes.addEventListener('input', writeNotes);
+    connectionButtons.forEach((button, type) => button.addEventListener('click', async () => {
+        const active = !state.locks.has(type);
+        if (active) state.locks.add(type);
+        else state.locks.delete(type);
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+        if (state.avatarId) {
+            try { await applyLocks(); }
+            catch (error) { console.warn(`[${EXTENSION_NAME}] Could not update persona connection.`, error); }
+        }
+    }));
+    saveButton.addEventListener('click', async () => {
+        if (state.busy || state.avatarId) return;
+        if (!nameInput.hidden) finishNameEdit();
+        const name = nameDisplay.textContent.trim();
+        if (!name || name === t('creatorName')) {
+            notify(t('creatorNameRequired'));
+            startNameEdit();
+            return;
+        }
+        if (!state.file) {
+            notify(t('creatorPhotoRequired'));
+            photoButton.classList.add('has-error');
+            photoButton.focus();
+            return;
+        }
+        const safeName = name.replace(/[^a-zA-Z0-9]/g, '') || 'persona';
+        const avatarId = `${Date.now()}-${safeName}.png`;
+        try {
+            state.busy = true;
+            saveButton.disabled = true;
+            saveButton.querySelector('span').textContent = t('creatorSaving');
+            saveButton.querySelector('i').className = 'fa-solid fa-hourglass-half';
+            await uploadPortrait(avatarId, state.file);
+            power_user.personas ||= {};
+            power_user.persona_descriptions ||= {};
+            power_user.personas[avatarId] = name;
+            power_user.persona_descriptions[avatarId] = {
+                description: description.value,
+                position: Number(position.value),
+                depth: Number(depth.value) || 0,
+                role: Number(role.value),
+                lorebook: lorebook.value,
+                connections: [],
+            };
+            state.avatarId = avatarId;
+            saveSettings();
+            await setUserAvatar(avatarId);
+            await applyLocks();
+            writeNotes();
+            const ctx = context();
+            const createdEvent = ctx?.event_types?.PERSONA_CREATED ?? ctx?.eventTypes?.PERSONA_CREATED;
+            if (createdEvent && ctx?.eventSource?.emit) {
+                await ctx.eventSource.emit(createdEvent, { avatarId, name, description: description.value });
+            }
+            workspace.classList.add('is-saved');
+            saveButton.querySelector('span').textContent = t('creatorSaved');
+            saveButton.querySelector('i').className = 'fa-solid fa-circle-check';
+            await refreshPersonaCount(personaCounter);
+            updateSpotlight();
+            notify(t('creatorSaved'), 'success');
+        } catch (error) {
+            console.error(`[${EXTENSION_NAME}] Could not create persona.`, error);
+            if (state.avatarId) {
+                delete power_user.personas?.[state.avatarId];
+                delete power_user.persona_descriptions?.[state.avatarId];
+                state.avatarId = '';
+            }
+            saveButton.disabled = false;
+            saveButton.querySelector('span').textContent = t('creatorSave');
+            saveButton.querySelector('i').className = 'fa-solid fa-check';
+            notify(t('creatorError'));
+        } finally {
+            state.busy = false;
+        }
+    });
+
+    reset();
+    return workspace;
+}
+
 function enhancePanel(panel) {
     if (!(panel instanceof HTMLElement) || panel.dataset.mppEnhanced === 'true') return;
     panel.dataset.mppEnhanced = 'true';
@@ -1211,12 +1706,12 @@ function enhancePanel(panel) {
     libraryHeader.append(libraryCopy, densityControls);
     leftColumn.prepend(libraryHeader);
     const { bar: filters, apply: applyFilter } = createFilterBar(avatarBlock);
+    const createButton = nativeToolbar?.querySelector(':scope > .menu_button:not(#persona_grid_toggle), :scope > button:not(#persona_grid_toggle)');
+    const searchInput = nativeToolbar?.querySelector('input[type="search"], input[type="text"]');
+    createButton?.classList.add('mpp-create-persona');
+    if (searchInput) searchInput.placeholder = t('searchByPersonaName');
     if (desktopLibraryLayout && nativeToolbar) {
-        const createButton = nativeToolbar.querySelector(':scope > .menu_button:not(#persona_grid_toggle), :scope > button:not(#persona_grid_toggle)');
-        const searchInput = nativeToolbar.querySelector('input[type="search"], input[type="text"]');
-        if (searchInput) searchInput.placeholder = t('searchByPersonaName');
         if (createButton) {
-            createButton.classList.add('mpp-create-persona');
             filters.appendChild(createButton);
         }
     }
@@ -1248,6 +1743,8 @@ function enhancePanel(panel) {
     renderEditorState();
 
     makeGlobalSettingsCollapsible(rightColumn.querySelector('.persona_management_global_settings'));
+    const creatorWorkspace = createPersonaWorkspace(panel, createButton, personaCounter, updateSpotlight);
+    if (creatorWorkspace) shell.appendChild(creatorWorkspace);
     decorateCards(avatarBlock);
     applyFilter();
     updateSpotlight();

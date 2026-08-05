@@ -701,6 +701,325 @@
     border-radius: 999px;
 }
 
+/* Persona creation workspace. It replaces the library without cloning native editor DOM. */
+#PersonaManagement.mpp-panel.mpp-creating :is(.mpp-spotlight, .mpp-main, .mpp-appearance) {
+    display: none !important;
+}
+
+.mpp-creator[hidden] { display: none !important; }
+
+.mpp-creator {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 9px;
+    padding: 10px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--mpp-surface) 92%, transparent);
+}
+
+.mpp-creator-top {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+#PersonaManagement.mpp-panel :is(.mpp-creator-back, .mpp-creator-save) {
+    width: max-content;
+    min-height: 36px;
+    padding: 7px 14px;
+    border-radius: 999px;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-save {
+    color: color-mix(in srgb, var(--mpp-accent) 70%, var(--mpp-text));
+    border-color: color-mix(in srgb, var(--mpp-accent) 56%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 14%, var(--mpp-surface));
+    font-weight: 700;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-save:disabled {
+    opacity: 0.78;
+    cursor: default;
+}
+
+.mpp-creator-body {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(250px, 29%) minmax(0, 1fr);
+    gap: 18px;
+    overflow: hidden;
+}
+
+.mpp-creator-left {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-photo {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 260px;
+    flex: 1 1 auto;
+    padding: 0;
+    place-items: center;
+    overflow: hidden;
+    color: var(--mpp-muted);
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 30%, var(--mpp-border));
+    border-radius: 34px;
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--mpp-accent) 10%, transparent), transparent 48%),
+        color-mix(in srgb, var(--mpp-surface) 86%, #fff 2%);
+    cursor: pointer;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-photo:hover,
+#PersonaManagement.mpp-panel .mpp-creator-photo:focus-visible {
+    color: var(--mpp-text);
+    border-color: var(--mpp-accent);
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-photo.has-error {
+    border-color: var(--mpp-danger);
+}
+
+.mpp-creator-photo img {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+}
+
+.mpp-creator-photo-empty {
+    display: flex;
+    max-width: 210px;
+    padding: 22px;
+    align-items: center;
+    flex-direction: column;
+    gap: 12px;
+    line-height: 1.25;
+    text-align: center;
+}
+
+.mpp-creator-photo-empty i {
+    color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text));
+    font-size: 2.2rem;
+}
+
+.mpp-creator-tools {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 9px;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-tool {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    padding: 9px 18px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    color: var(--mpp-text);
+    border: 1px solid var(--mpp-border);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mpp-surface) 92%, transparent);
+    font-size: calc(0.92rem + var(--mpp-font-adjust));
+    font-weight: 700;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-tool:hover,
+#PersonaManagement.mpp-panel .mpp-creator-tool.is-active {
+    border-color: color-mix(in srgb, var(--mpp-accent) 68%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 13%, var(--mpp-surface));
+}
+
+.mpp-creator-right {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    grid-template-rows: auto minmax(220px, 1fr) auto auto;
+    align-content: stretch;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.mpp-creator-identity {
+    display: flex;
+    min-width: 0;
+    min-height: 72px;
+    padding: 4px 10px 10px 18px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 2px solid color-mix(in srgb, var(--mpp-accent) 38%, var(--mpp-border));
+}
+
+.mpp-creator-identity-copy { min-width: 0; flex: 1 1 auto; }
+
+.mpp-creator-name {
+    display: block;
+    overflow: hidden;
+    color: var(--mpp-text);
+    font-size: clamp(1.35rem, 2.2cqi, 2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-name-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 5px 10px;
+    color: var(--mpp-text);
+    border: 1px solid var(--mpp-accent);
+    border-radius: 10px;
+    background: var(--mpp-surface);
+    font-size: clamp(1.15rem, 2cqi, 1.7rem);
+    font-weight: 750;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-rename {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 13px;
+}
+
+.mpp-creator-field {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    padding: 12px;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--mpp-border);
+    border-radius: 26px;
+    background: color-mix(in srgb, var(--mpp-surface) 88%, transparent);
+}
+
+.mpp-creator-field-head {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mpp-creator-field-head > strong,
+.mpp-creator-notes > strong {
+    padding-inline: 10px;
+    color: var(--mpp-text);
+    font-size: calc(1rem + var(--mpp-font-adjust));
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-description-expand {
+    width: 38px;
+    height: 34px;
+    flex: 0 0 38px;
+    border-radius: 11px;
+}
+
+#PersonaManagement.mpp-panel :is(.mpp-creator-description-input, .mpp-creator-notes textarea) {
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    resize: none;
+    color: var(--mpp-text);
+    border: 0;
+    border-radius: 17px;
+    background: color-mix(in srgb, var(--mpp-surface) 84%, #000 6%);
+    line-height: 1.45;
+}
+
+.mpp-creator-tool-stage {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--mpp-accent) 5%, var(--mpp-surface));
+}
+
+.mpp-creator-tool-panel {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+}
+
+.mpp-creator-tool-panel[hidden] { display: none !important; }
+
+.mpp-creator-depth-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.mpp-creator-depth-row label {
+    display: grid;
+    gap: 5px;
+    color: var(--mpp-muted);
+}
+
+.mpp-creator-connections {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-connection {
+    display: flex;
+    min-height: 42px;
+    padding: 8px 10px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: var(--mpp-muted);
+    border: 1px solid var(--mpp-border);
+    border-radius: 999px;
+    background: var(--mpp-surface);
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-connection.is-active {
+    color: var(--mpp-text);
+    border-color: var(--mpp-accent);
+    background: color-mix(in srgb, var(--mpp-accent) 16%, var(--mpp-surface));
+}
+
+.mpp-creator-notes { min-height: 128px; }
+.mpp-creator-notes small { padding-inline: 10px; color: var(--mpp-muted); }
+
+.mpp-creator.is-description-expanded .mpp-creator-description {
+    position: absolute;
+    z-index: 5;
+    inset: 84px 0 0;
+    border-color: color-mix(in srgb, var(--mpp-accent) 45%, var(--mpp-border));
+}
+
+.mpp-creator.is-description-expanded :is(.mpp-creator-tool-stage, .mpp-creator-notes) {
+    visibility: hidden;
+}
+
+.mpp-creator.is-saved .mpp-creator-save {
+    color: var(--mpp-positive);
+    border-color: color-mix(in srgb, var(--mpp-positive) 55%, var(--mpp-border));
+}
+
 .mpp-library-header {
     display: flex;
     flex: 0 0 auto;
@@ -731,6 +1050,10 @@
     border: 0;
     background: transparent;
     white-space: nowrap;
+}
+
+.mpp-library-header h3 .mpp-persona-counter {
+    color: inherit !important;
 }
 
 .mpp-density {
