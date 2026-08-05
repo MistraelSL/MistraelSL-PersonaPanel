@@ -306,7 +306,7 @@
     object-position: center top;
 }
 
-#PersonaManagement.mpp-panel .mpp-spotlight-crop-button {
+#PersonaManagement.mpp-panel :is(.mpp-spotlight-visual-crop-button, .mpp-spotlight-crop-button) {
     display: none;
 }
 
@@ -337,6 +337,124 @@
 .mpp-crop-row input { width: 100%; accent-color: var(--mpp-accent); }
 .mpp-crop-row output { color: var(--mpp-text); font-variant-numeric: tabular-nums; text-align: right; }
 #PersonaManagement.mpp-panel .mpp-crop-reset { width: max-content; min-height: 31px; padding-inline: 10px; justify-self: end; }
+
+.mpp-visual-crop-backdrop {
+    position: fixed;
+    z-index: 14000;
+    inset: 0;
+    display: grid;
+    padding: 22px;
+    place-items: center;
+    background: rgba(3, 4, 8, 0.78);
+}
+
+.mpp-visual-crop-backdrop[hidden] { display: none !important; }
+
+.mpp-visual-crop-backdrop .mpp-button {
+    display: inline-flex;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 7px 10px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: var(--mpp-text, #f5f2ff);
+    border: 1px solid var(--mpp-border, rgba(255, 255, 255, 0.2));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--mpp-tint, #171522) 82%, transparent);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.mpp-visual-crop-backdrop .mpp-button:hover {
+    color: color-mix(in srgb, var(--mpp-accent, #a78bfa) 72%, white);
+    border-color: color-mix(in srgb, var(--mpp-accent, #a78bfa) 56%, var(--mpp-border, rgba(255, 255, 255, 0.2)));
+}
+
+.mpp-visual-crop-modal {
+    display: grid;
+    width: min(820px, calc(100dvw - 32px));
+    max-height: calc(100dvh - 32px);
+    padding: 14px;
+    gap: 12px;
+    overflow: hidden;
+    color: var(--mpp-text, #f5f2ff);
+    border: 1px solid var(--mpp-border, rgba(255, 255, 255, 0.2));
+    border-radius: 18px;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--mpp-accent, #a78bfa) 10%, transparent), transparent 54%),
+        color-mix(in srgb, var(--mpp-tint, #171522) 97%, #09090d);
+    box-shadow: 0 28px 74px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mpp-visual-crop-header,
+.mpp-visual-crop-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.mpp-visual-crop-header > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.mpp-visual-crop-header strong { color: var(--mpp-text, #f5f2ff); font-size: 1rem; }
+.mpp-visual-crop-header small { color: var(--mpp-muted, rgba(255, 255, 255, 0.65)); font-size: 0.75rem; }
+.mpp-visual-crop-close { flex: 0 0 auto; }
+
+.mpp-visual-crop-stage {
+    position: relative;
+    width: 100%;
+    height: min(620px, calc(100dvh - 190px));
+    min-height: 280px;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    border: 1px solid color-mix(in srgb, var(--mpp-accent, #a78bfa) 34%, transparent);
+    border-radius: 13px;
+    background:
+        linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.035) 75%),
+        linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.035) 75%),
+        #0a0a0f;
+    background-position: 0 0, 10px 10px;
+    background-size: 20px 20px;
+}
+
+.mpp-visual-crop-image {
+    position: absolute;
+    max-width: none;
+    max-height: none;
+    pointer-events: none;
+}
+
+.mpp-visual-crop-selection {
+    position: absolute;
+    z-index: 2;
+    cursor: move;
+    touch-action: none;
+    border: 2px solid color-mix(in srgb, var(--mpp-accent, #a78bfa) 76%, white);
+    background:
+        linear-gradient(to right, transparent 33.1%, rgba(255,255,255,.34) 33.1%, rgba(255,255,255,.34) 33.5%, transparent 33.5%, transparent 66.2%, rgba(255,255,255,.34) 66.2%, rgba(255,255,255,.34) 66.6%, transparent 66.6%),
+        linear-gradient(to bottom, transparent 33.1%, rgba(255,255,255,.34) 33.1%, rgba(255,255,255,.34) 33.5%, transparent 33.5%, transparent 66.2%, rgba(255,255,255,.34) 66.2%, rgba(255,255,255,.34) 66.6%, transparent 66.6%);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(0, 0, 0, 0.38);
+}
+
+.mpp-visual-crop-selection[hidden] { display: none !important; }
+
+.mpp-visual-crop-handle {
+    position: absolute;
+    right: -8px;
+    bottom: -8px;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    border: 2px solid white;
+    border-radius: 4px;
+    background: var(--mpp-accent, #a78bfa);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.mpp-visual-crop-actions { justify-content: flex-end; }
+.mpp-visual-crop-actions .mpp-button { min-height: 36px; padding-inline: 14px; }
+.mpp-visual-crop-apply { color: color-mix(in srgb, var(--mpp-accent, #a78bfa) 74%, white) !important; border-color: var(--mpp-accent, #a78bfa) !important; }
 
 .mpp-spotlight-copy {
     gap: 1px;
@@ -1328,21 +1446,16 @@
     }
 
     .mpp-spotlight-portrait img {
-        --mpp-crop-shift-x: 0%;
-        --mpp-crop-shift-y: 11.2%;
-        --mpp-crop-zoom: 1;
-
         position: absolute;
         z-index: 1;
-        top: 50%;
-        left: 50%;
-        width: 140%;
-        height: 170%;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         max-width: none;
         max-height: none;
-        object-position: center;
-        transform: translate3d(calc(-50% + var(--mpp-crop-shift-x)), calc(-50% + var(--mpp-crop-shift-y)), 0) scale(var(--mpp-crop-zoom));
-        transform-origin: center;
+        object-fit: contain;
+        transform: none;
         image-rendering: auto;
     }
 
@@ -1359,11 +1472,10 @@
     }
 
     .mpp-spotlight-copy strong { font-size: calc(1.02rem + var(--mpp-font-adjust)); }
-    #PersonaManagement.mpp-panel .mpp-spotlight-crop-button {
+    #PersonaManagement.mpp-panel :is(.mpp-spotlight-visual-crop-button, .mpp-spotlight-crop-button) {
         position: absolute;
         z-index: 5;
         bottom: 12px;
-        left: 12px;
         display: inline-flex;
         width: 30px;
         min-width: 30px;
@@ -1372,6 +1484,9 @@
         border-radius: 9px;
         background: color-mix(in srgb, var(--mpp-tint) 88%, transparent);
     }
+
+    #PersonaManagement.mpp-panel .mpp-spotlight-visual-crop-button { left: 12px; }
+    #PersonaManagement.mpp-panel .mpp-spotlight-crop-button { left: 48px; }
 }
 
 @media (hover: none), (pointer: coarse) {

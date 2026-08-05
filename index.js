@@ -10,7 +10,7 @@ const DENSITY_KEY = 'MistraelSL_PersonaPanel_density';
 const MOBILE_COLUMNS_KEY = 'MistraelSL_PersonaPanel_mobileColumns';
 const FAVORITES_KEY = 'MistraelSL_PersonaPanel_favorites';
 const WINDOW_MODE_KEY = 'MistraelSL_PersonaPanel_windowMode';
-const PORTRAIT_CROP_KEY = 'MistraelSL_PersonaPanel_portraitCrop';
+const PORTRAIT_CROP_KEY = 'MistraelSL_PersonaPanel_portraitCrop_v2';
 
 const DEFAULT_APPEARANCE = Object.freeze({
     theme: 'native',
@@ -105,6 +105,11 @@ const I18N = {
         expandWindow: 'Use tall window',
         reduceWindow: 'Use standard window',
         cropPortrait: 'Adjust current persona portrait',
+        visualCropPortrait: 'Choose crop area',
+        fineTunePortrait: 'Fine-tune with sliders',
+        cropInstruction: 'Move the frame and drag its corner to choose the visible area.',
+        applyCrop: 'Apply crop',
+        cancelCrop: 'Cancel',
         cropHorizontal: 'Horizontal position',
         cropVertical: 'Vertical position',
         cropZoom: 'Zoom',
@@ -163,6 +168,11 @@ const I18N = {
         expandWindow: 'Развернуть панель по высоте',
         reduceWindow: 'Вернуть обычную высоту',
         cropPortrait: 'Настроить портрет текущей персоны',
+        visualCropPortrait: 'Выбрать область кадра',
+        fineTunePortrait: 'Точная настройка ползунками',
+        cropInstruction: 'Перемещайте рамку и тяните за её угол, чтобы выбрать видимую область.',
+        applyCrop: 'Применить кадр',
+        cancelCrop: 'Отмена',
         cropHorizontal: 'Положение по горизонтали',
         cropVertical: 'Положение по вертикали',
         cropZoom: 'Приближение',
@@ -240,7 +250,7 @@ function getPortraitCrop(avatarId) {
     return {
         x: clampNumber(stored.x, 0, 100, 50),
         y: clampNumber(stored.y, 0, 100, 22),
-        zoom: clampNumber(stored.zoom, 100, 200, 100),
+        zoom: clampNumber(stored.zoom, 100, 200, 115),
     };
 }
 
@@ -254,6 +264,30 @@ function resetPortraitCrop(avatarId) {
     if (!avatarId) return;
     delete portraitCrops[avatarId];
     localStorage.setItem(PORTRAIT_CROP_KEY, JSON.stringify(portraitCrops));
+}
+
+function getCropGeometry(crop, naturalWidth, naturalHeight, frameRatio) {
+    if (!naturalWidth || !naturalHeight || !frameRatio) return null;
+    const imageRatio = naturalWidth / naturalHeight;
+    const baseWidth = imageRatio >= frameRatio ? frameRatio / imageRatio : 1;
+    const baseHeight = imageRatio >= frameRatio ? 1 : imageRatio / frameRatio;
+    const zoom = clampNumber(crop.zoom, 100, 200, 115) / 100;
+    const width = baseWidth / zoom;
+    const height = baseHeight / zoom;
+    const centerX = Math.min(1 - width / 2, Math.max(width / 2, clampNumber(crop.x, 0, 100, 50) / 100));
+    const centerY = Math.min(1 - height / 2, Math.max(height / 2, clampNumber(crop.y, 0, 100, 22) / 100));
+    return { left: centerX - width / 2, top: centerY - height / 2, width, height };
+}
+
+function cropGeometryToSettings(geometry, naturalWidth, naturalHeight, frameRatio) {
+    const imageRatio = naturalWidth / naturalHeight;
+    const baseWidth = imageRatio >= frameRatio ? frameRatio / imageRatio : 1;
+    const baseHeight = imageRatio >= frameRatio ? 1 : imageRatio / frameRatio;
+    return {
+        x: Math.round((geometry.left + geometry.width / 2) * 100),
+        y: Math.round((geometry.top + geometry.height / 2) * 100),
+        zoom: Math.round(Math.max(baseWidth / geometry.width, baseHeight / geometry.height) * 100),
+    };
 }
 
 function createIconButton(icon, label, className = '') {
@@ -557,12 +591,13 @@ function createSpotlight(panel, editorButton) {
     const hint = createElement('span', '', t('noSelection'));
     copy.append(kicker, name, hint);
 
-    const cropButton = createIconButton('fa-crop-simple', t('cropPortrait'), 'mpp-spotlight-crop-button');
-    cropButton.setAttribute('aria-expanded', 'false');
+    const visualCropButton = createIconButton('fa-crop-simple', t('visualCropPortrait'), 'mpp-spotlight-visual-crop-button');
+    const slidersButton = createIconButton('fa-sliders', t('fineTunePortrait'), 'mpp-spotlight-crop-button');
+    slidersButton.setAttribute('aria-expanded', 'false');
     const cropPanel = createElement('section', 'mpp-crop-panel');
     cropPanel.hidden = true;
     const cropHeader = createElement('header', 'mpp-crop-header');
-    cropHeader.appendChild(createElement('strong', '', t('cropPortrait')));
+    cropHeader.appendChild(createElement('strong', '', t('fineTunePortrait')));
     const closeCropButton = createIconButton('fa-xmark', t('closeCrop'), 'mpp-crop-close');
     cropHeader.appendChild(closeCropButton);
 
@@ -589,6 +624,38 @@ function createSpotlight(panel, editorButton) {
     resetCropButton.append(createElement('i', 'fa-solid fa-arrow-rotate-left'), createElement('span', '', t('resetCrop')));
     cropPanel.append(cropHeader, cropControls, resetCropButton);
 
+    const cropModalBackdrop = createElement('div', 'mpp-visual-crop-backdrop');
+    cropModalBackdrop.hidden = true;
+    cropModalBackdrop.tabIndex = -1;
+    const cropModal = createElement('section', 'mpp-visual-crop-modal');
+    cropModal.setAttribute('role', 'dialog');
+    cropModal.setAttribute('aria-modal', 'true');
+    const modalHeader = createElement('header', 'mpp-visual-crop-header');
+    const modalHeading = createElement('span');
+    modalHeading.append(createElement('strong', '', t('visualCropPortrait')), createElement('small', '', t('cropInstruction')));
+    const modalClose = createIconButton('fa-xmark', t('cancelCrop'), 'mpp-visual-crop-close');
+    modalHeader.append(modalHeading, modalClose);
+    const cropStage = createElement('div', 'mpp-visual-crop-stage');
+    const stageImage = createElement('img', 'mpp-visual-crop-image');
+    stageImage.alt = '';
+    stageImage.draggable = false;
+    const cropSelection = createElement('div', 'mpp-visual-crop-selection');
+    cropSelection.hidden = true;
+    const cropHandle = createElement('span', 'mpp-visual-crop-handle');
+    cropSelection.appendChild(cropHandle);
+    cropStage.append(stageImage, cropSelection);
+    const modalActions = createElement('footer', 'mpp-visual-crop-actions');
+    const cancelCropButton = createElement('button', 'mpp-button');
+    cancelCropButton.type = 'button';
+    cancelCropButton.textContent = t('cancelCrop');
+    const applyCropButton = createElement('button', 'mpp-button mpp-visual-crop-apply');
+    applyCropButton.type = 'button';
+    applyCropButton.textContent = t('applyCrop');
+    modalActions.append(cancelCropButton, applyCropButton);
+    cropModal.append(modalHeader, cropStage, modalActions);
+    cropModalBackdrop.appendChild(cropModal);
+    document.body.appendChild(cropModalBackdrop);
+
     const openEditor = createElement('button', 'mpp-button mpp-spotlight-edit');
     openEditor.type = 'button';
     openEditor.append(createElement('i', 'fa-solid fa-pen-to-square'), createElement('span', '', t('showEditor')));
@@ -596,18 +663,32 @@ function createSpotlight(panel, editorButton) {
         if (panel.classList.contains('mpp-editor-collapsed')) editorButton.click();
         panel.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-    spotlight.append(portrait, copy, cropButton, openEditor, cropPanel);
+    spotlight.append(portrait, copy, visualCropButton, slidersButton, openEditor, cropPanel);
 
     let currentAvatarId = '';
+    let currentCrop = getPortraitCrop('');
+    let modalOriginalCrop = null;
+    let modalGeometry = null;
+    let modalImageRect = null;
+
+    const getFrameRatio = () => {
+        const rect = portrait.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 ? rect.width / rect.height : 4.4;
+    };
+
     const applyCrop = crop => {
-        image.style.setProperty('--mpp-crop-shift-x', `${(50 - crop.x) * 0.28}%`);
-        image.style.setProperty('--mpp-crop-shift-y', `${(50 - crop.y) * 0.4}%`);
-        image.style.setProperty('--mpp-crop-zoom', String(crop.zoom / 100));
+        currentCrop = { x: Number(crop.x), y: Number(crop.y), zoom: Number(crop.zoom) };
         Object.entries(cropInputs).forEach(([key, elements]) => {
-            const value = crop[key];
+            const value = currentCrop[key];
             elements.input.value = String(value);
             elements.output.textContent = key === 'zoom' ? `${value}%` : String(value);
         });
+        const geometry = getCropGeometry(currentCrop, image.naturalWidth, image.naturalHeight, getFrameRatio());
+        if (!geometry) return;
+        image.style.width = `${100 / geometry.width}%`;
+        image.style.height = `${100 / geometry.height}%`;
+        image.style.left = `${-geometry.left / geometry.width * 100}%`;
+        image.style.top = `${-geometry.top / geometry.height * 100}%`;
     };
     const readCropControls = () => ({
         x: Number(cropInputs.x.input.value),
@@ -616,15 +697,15 @@ function createSpotlight(panel, editorButton) {
     });
     const setCropPanelOpen = open => {
         cropPanel.hidden = !open;
-        cropButton.classList.toggle('is-active', open);
-        cropButton.setAttribute('aria-expanded', String(open));
+        slidersButton.classList.toggle('is-active', open);
+        slidersButton.setAttribute('aria-expanded', String(open));
     };
-    cropButton.addEventListener('click', () => setCropPanelOpen(cropPanel.hidden));
+    slidersButton.addEventListener('click', () => setCropPanelOpen(cropPanel.hidden));
     closeCropButton.addEventListener('click', () => setCropPanelOpen(false));
     cropPanel.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             setCropPanelOpen(false);
-            cropButton.focus();
+            slidersButton.focus();
         }
     });
     Object.values(cropInputs).forEach(({ input }) => {
@@ -636,6 +717,128 @@ function createSpotlight(panel, editorButton) {
         applyCrop(getPortraitCrop(currentAvatarId));
     });
 
+    const getContainedImageRect = () => {
+        const stageRect = cropStage.getBoundingClientRect();
+        if (!stageImage.naturalWidth || !stageImage.naturalHeight || !stageRect.width || !stageRect.height) return null;
+        const imageRatio = stageImage.naturalWidth / stageImage.naturalHeight;
+        const stageRatio = stageRect.width / stageRect.height;
+        if (imageRatio >= stageRatio) {
+            const width = stageRect.width;
+            const height = width / imageRatio;
+            return { left: 0, top: (stageRect.height - height) / 2, width, height };
+        }
+        const height = stageRect.height;
+        const width = height * imageRatio;
+        return { left: (stageRect.width - width) / 2, top: 0, width, height };
+    };
+
+    const renderModalCrop = crop => {
+        if (!stageImage.naturalWidth || !stageImage.naturalHeight) return;
+        modalImageRect = getContainedImageRect();
+        if (!modalImageRect) return;
+        stageImage.style.left = `${modalImageRect.left}px`;
+        stageImage.style.top = `${modalImageRect.top}px`;
+        stageImage.style.width = `${modalImageRect.width}px`;
+        stageImage.style.height = `${modalImageRect.height}px`;
+        modalGeometry = getCropGeometry(crop, stageImage.naturalWidth, stageImage.naturalHeight, getFrameRatio());
+        if (!modalGeometry) return;
+        cropSelection.style.left = `${modalImageRect.left + modalGeometry.left * modalImageRect.width}px`;
+        cropSelection.style.top = `${modalImageRect.top + modalGeometry.top * modalImageRect.height}px`;
+        cropSelection.style.width = `${modalGeometry.width * modalImageRect.width}px`;
+        cropSelection.style.height = `${modalGeometry.height * modalImageRect.height}px`;
+        cropSelection.hidden = false;
+    };
+
+    const closeVisualCrop = apply => {
+        if (!apply && modalOriginalCrop) applyCrop(modalOriginalCrop);
+        cropModalBackdrop.hidden = true;
+        cropSelection.hidden = true;
+        modalOriginalCrop = null;
+        modalGeometry = null;
+    };
+
+    const openVisualCrop = () => {
+        if (!currentAvatarId || !image.src) return;
+        setCropPanelOpen(false);
+        modalOriginalCrop = { ...currentCrop };
+        cropSelection.hidden = true;
+        stageImage.src = image.src;
+        const panelStyle = getComputedStyle(panel);
+        ['--mpp-text', '--mpp-muted', '--mpp-border', '--mpp-accent', '--mpp-tint'].forEach(property => {
+            cropModalBackdrop.style.setProperty(property, panelStyle.getPropertyValue(property));
+        });
+        cropModalBackdrop.hidden = false;
+        requestAnimationFrame(() => {
+            renderModalCrop(currentCrop);
+            cropModalBackdrop.focus();
+        });
+    };
+
+    visualCropButton.addEventListener('click', openVisualCrop);
+    stageImage.addEventListener('load', () => renderModalCrop(currentCrop));
+    modalClose.addEventListener('click', () => closeVisualCrop(false));
+    cancelCropButton.addEventListener('click', () => closeVisualCrop(false));
+    applyCropButton.addEventListener('click', () => {
+        savePortraitCrop(currentAvatarId, currentCrop);
+        closeVisualCrop(true);
+    });
+    cropModalBackdrop.addEventListener('click', event => {
+        if (event.target === cropModalBackdrop) closeVisualCrop(false);
+    });
+    cropModalBackdrop.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeVisualCrop(false);
+    });
+
+    let cropInteraction = null;
+    cropSelection.addEventListener('pointerdown', event => {
+        if (!modalGeometry || !modalImageRect) return;
+        event.preventDefault();
+        cropSelection.setPointerCapture(event.pointerId);
+        cropInteraction = {
+            mode: event.target === cropHandle ? 'resize' : 'move',
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            geometry: { ...modalGeometry },
+        };
+    });
+    cropSelection.addEventListener('pointermove', event => {
+        if (!cropInteraction || event.pointerId !== cropInteraction.pointerId || !modalImageRect) return;
+        const start = cropInteraction.geometry;
+        let geometry = { ...start };
+        const deltaX = (event.clientX - cropInteraction.startX) / modalImageRect.width;
+        const deltaY = (event.clientY - cropInteraction.startY) / modalImageRect.height;
+        if (cropInteraction.mode === 'move') {
+            geometry.left = Math.min(1 - geometry.width, Math.max(0, start.left + deltaX));
+            geometry.top = Math.min(1 - geometry.height, Math.max(0, start.top + deltaY));
+        } else {
+            const imageRatio = stageImage.naturalWidth / stageImage.naturalHeight;
+            const frameRatio = getFrameRatio();
+            const widthFromX = start.width + deltaX;
+            const widthFromY = (start.height + deltaY) * frameRatio / imageRatio;
+            const proposedWidth = Math.abs(deltaX) >= Math.abs(deltaY) ? widthFromX : widthFromY;
+            const base = getCropGeometry({ x: 50, y: 50, zoom: 100 }, stageImage.naturalWidth, stageImage.naturalHeight, frameRatio);
+            const minWidth = base.width / 2;
+            const maxWidth = Math.min(base.width, 1 - start.left, (1 - start.top) * frameRatio / imageRatio);
+            geometry.width = Math.min(maxWidth, Math.max(minWidth, proposedWidth));
+            geometry.height = geometry.width * imageRatio / frameRatio;
+        }
+        const settings = cropGeometryToSettings(geometry, stageImage.naturalWidth, stageImage.naturalHeight, getFrameRatio());
+        applyCrop(settings);
+        renderModalCrop(settings);
+    });
+    const finishCropInteraction = event => {
+        if (!cropInteraction || event.pointerId !== cropInteraction.pointerId) return;
+        cropInteraction = null;
+    };
+    cropSelection.addEventListener('pointerup', finishCropInteraction);
+    cropSelection.addEventListener('pointercancel', finishCropInteraction);
+    window.addEventListener('resize', () => {
+        if (!cropModalBackdrop.hidden) renderModalCrop(currentCrop);
+    });
+
+    image.addEventListener('load', () => applyCrop(currentCrop));
+
     const update = () => {
         const selected = panel.querySelector('#user_avatar_block > .avatar-container.selected')
             || panel.querySelector('#user_avatar_block > .avatar-container');
@@ -643,9 +846,11 @@ function createSpotlight(panel, editorButton) {
         const selectedName = panel.querySelector('#your_name')?.textContent?.trim()
             || selected?.querySelector('.ch_name')?.textContent?.trim();
         currentAvatarId = selected ? getCardAvatarId(selected) : '';
-        image.src = selectedImage?.src || '';
+        const nextSource = selectedImage?.src || '';
+        if (image.src !== nextSource) image.src = nextSource;
         portrait.hidden = !selectedImage?.src;
-        cropButton.hidden = !selectedImage?.src || !currentAvatarId;
+        visualCropButton.hidden = !selectedImage?.src || !currentAvatarId;
+        slidersButton.hidden = !selectedImage?.src || !currentAvatarId;
         applyCrop(getPortraitCrop(currentAvatarId));
         name.textContent = selectedName || t('noSelection');
         hint.textContent = selected?.classList.contains('default_persona')
