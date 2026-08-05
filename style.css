@@ -763,10 +763,11 @@
     display: grid;
     min-width: 0;
     min-height: 0;
-    grid-template-rows: clamp(260px, 38dvh, 360px) auto minmax(0, 1fr);
-    align-content: stretch;
+    grid-template-rows: clamp(390px, 49dvh, 520px) auto auto;
+    align-content: start;
     gap: 14px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .mpp-creator-photo-frame {
@@ -812,53 +813,8 @@
     height: 100%;
     max-width: none;
     max-height: none;
-}
-
-#PersonaManagement.mpp-panel .mpp-creator-photo-crop {
-    position: absolute;
-    z-index: 3;
-    top: 10px;
-    right: 10px;
-    width: 36px;
-    height: 36px;
-    border-radius: 11px;
-    background: color-mix(in srgb, var(--mpp-tint) 88%, transparent);
-}
-
-.mpp-creator-photo-crop-controls {
-    position: absolute;
-    z-index: 4;
-    right: 10px;
-    bottom: 10px;
-    left: 10px;
-    display: grid;
-    gap: 7px;
-    padding: 10px;
-    border: 1px solid color-mix(in srgb, var(--mpp-accent) 38%, var(--mpp-border));
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--mpp-tint) 94%, #000 10%);
-}
-
-.mpp-creator-photo-crop-controls[hidden] { display: none !important; }
-
-.mpp-creator-photo-crop-controls label {
-    display: grid;
-    grid-template-columns: minmax(76px, auto) minmax(0, 1fr) 40px;
-    align-items: center;
-    gap: 7px;
-    color: var(--mpp-text);
-    font-size: calc(0.65rem + var(--mpp-font-adjust));
-}
-
-.mpp-creator-photo-crop-controls input {
-    width: 100%;
-    accent-color: var(--mpp-accent);
-}
-
-.mpp-creator-photo-crop-controls output {
-    color: var(--mpp-muted);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
+    object-fit: cover;
+    object-position: center;
 }
 
 .mpp-creator-photo-empty {
@@ -1011,8 +967,7 @@
     min-width: 0;
     min-height: 0;
     padding: 12px;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
     border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
     border-radius: 20px;
     background: color-mix(in srgb, var(--mpp-accent) 5%, var(--mpp-surface));
@@ -1026,6 +981,44 @@
 }
 
 .mpp-creator-tool-panel[hidden] { display: none !important; }
+
+.mpp-creator-choice-list {
+    display: grid;
+    gap: 8px;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-choice {
+    display: flex;
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 14px;
+    align-items: center;
+    justify-content: flex-start;
+    color: var(--mpp-muted);
+    border: 1px solid var(--mpp-border);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mpp-surface) 92%, transparent);
+    font-weight: 650;
+    text-align: left;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-choice:hover {
+    color: var(--mpp-text);
+    border-color: color-mix(in srgb, var(--mpp-accent) 50%, var(--mpp-border));
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-choice.is-active {
+    color: var(--mpp-text);
+    border-color: var(--mpp-accent);
+    background: color-mix(in srgb, var(--mpp-accent) 18%, var(--mpp-surface));
+    box-shadow: inset 3px 0 0 var(--mpp-accent);
+}
+
+.mpp-creator-lorebook-list {
+    max-height: 310px;
+    padding-right: 3px;
+    overflow-y: auto;
+}
 
 .mpp-creator-depth-row {
     display: grid;
@@ -1048,7 +1041,7 @@
     min-height: 42px;
     padding: 8px 10px;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 7px;
     color: var(--mpp-muted);
     border: 1px solid var(--mpp-border);
@@ -1060,6 +1053,7 @@
     color: var(--mpp-text);
     border-color: var(--mpp-accent);
     background: color-mix(in srgb, var(--mpp-accent) 16%, var(--mpp-surface));
+    box-shadow: inset 3px 0 0 var(--mpp-accent);
 }
 
 .mpp-creator-notes { min-height: 128px; }

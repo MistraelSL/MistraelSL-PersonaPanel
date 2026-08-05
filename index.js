@@ -1,4 +1,4 @@
-import { getUserAvatars, isPersonaLocked, setUserAvatar, togglePersonaLock } from '../../../personas.js';
+import { getUserAvatars, initPersona, isPersonaLocked, setUserAvatar, togglePersonaLock } from '../../../personas.js';
 import { power_user } from '../../../power-user.js';
 import { world_names } from '../../../world-info.js';
 
@@ -1280,29 +1280,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     photoInput.accept = 'image/*';
     photoInput.hidden = true;
     photoButton.append(photoImage, photoEmpty);
-    const photoCropButton = createIconButton('fa-crop-simple', t('creatorCropPhoto'), 'mpp-creator-photo-crop');
-    photoCropButton.hidden = true;
-    const photoCropControls = createElement('section', 'mpp-creator-photo-crop-controls');
-    photoCropControls.hidden = true;
-    const photoCropInputs = {};
-    const addPhotoCropRange = (key, label, min, max, value) => {
-        const row = createElement('label');
-        const copy = createElement('span', '', label);
-        const input = createElement('input');
-        input.type = 'range';
-        input.min = String(min);
-        input.max = String(max);
-        input.value = String(value);
-        input.step = '1';
-        const output = createElement('output', '', key === 'zoom' ? `${value}%` : String(value));
-        row.append(copy, input, output);
-        photoCropControls.appendChild(row);
-        photoCropInputs[key] = { input, output };
-    };
-    addPhotoCropRange('x', t('cropHorizontal'), 0, 100, 50);
-    addPhotoCropRange('y', t('cropVertical'), 0, 100, 50);
-    addPhotoCropRange('zoom', t('cropZoom'), 100, 200, 100);
-    photoFrame.append(photoButton, photoCropButton, photoCropControls);
+    photoFrame.appendChild(photoButton);
 
     const toolNav = createElement('nav', 'mpp-creator-tools');
     const toolDefinitions = [
@@ -1349,13 +1327,25 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const positionPanel = createElement('div', 'mpp-creator-tool-panel');
     positionPanel.dataset.creatorPanel = 'position';
     const position = createElement('select', 'text_pole');
-    [
+    position.hidden = true;
+    const positionChoices = createElement('div', 'mpp-creator-choice-list');
+    const positionButtons = new Map();
+    const positionDefinitions = [
         [0, t('creatorInPrompt')],
         [2, t('creatorTopAn')],
         [3, t('creatorBottomAn')],
         [4, t('creatorAtDepth')],
         [9, t('creatorNone')],
-    ].forEach(([value, label]) => position.appendChild(new Option(label, String(value))));
+    ];
+    positionDefinitions.forEach(([value, label]) => {
+        position.appendChild(new Option(label, String(value)));
+        const button = createElement('button', 'mpp-creator-choice', label);
+        button.type = 'button';
+        button.dataset.value = String(value);
+        button.setAttribute('aria-pressed', 'false');
+        positionButtons.set(String(value), button);
+        positionChoices.appendChild(button);
+    });
     const depthRow = createElement('div', 'mpp-creator-depth-row');
     const depthLabel = createElement('label');
     depthLabel.append(createElement('span', '', t('creatorDepth')));
@@ -1372,7 +1362,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         .forEach(([value, label]) => role.appendChild(new Option(label, String(value))));
     roleLabel.appendChild(role);
     depthRow.append(depthLabel, roleLabel);
-    positionPanel.append(position, depthRow);
+    positionPanel.append(position, positionChoices, depthRow);
 
     const connectionsPanel = createElement('div', 'mpp-creator-tool-panel mpp-creator-connections');
     connectionsPanel.dataset.creatorPanel = 'connections';
@@ -1395,7 +1385,9 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const lorebookPanel = createElement('div', 'mpp-creator-tool-panel');
     lorebookPanel.dataset.creatorPanel = 'lorebook';
     const lorebook = createElement('select', 'text_pole');
-    lorebookPanel.appendChild(lorebook);
+    lorebook.hidden = true;
+    const lorebookChoices = createElement('div', 'mpp-creator-choice-list mpp-creator-lorebook-list');
+    lorebookPanel.append(lorebook, lorebookChoices);
     toolStage.append(positionPanel, connectionsPanel, lorebookPanel);
     left.appendChild(toolStage);
 
@@ -1417,7 +1409,6 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         objectUrl: '',
         previousWindowMode: 'standard',
         locks: new Set(),
-        crop: { x: 50, y: 50, zoom: 100 },
     };
     let descriptionTimer;
 
@@ -1463,8 +1454,31 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         lorebook.replaceChildren(new Option(t('creatorNoLorebook'), ''));
         for (const name of world_names || []) lorebook.appendChild(new Option(name, name));
         lorebook.value = [...lorebook.options].some(option => option.value === selected) ? selected : '';
+        lorebookChoices.replaceChildren();
+        [...lorebook.options].forEach(option => {
+            const button = createElement('button', 'mpp-creator-choice', option.textContent);
+            button.type = 'button';
+            button.dataset.value = option.value;
+            button.classList.toggle('is-active', option.value === lorebook.value);
+            button.setAttribute('aria-pressed', String(option.value === lorebook.value));
+            button.addEventListener('click', () => {
+                lorebook.value = option.value;
+                lorebookChoices.querySelectorAll('.mpp-creator-choice').forEach(choice => {
+                    const active = choice.dataset.value === lorebook.value;
+                    choice.classList.toggle('is-active', active);
+                    choice.setAttribute('aria-pressed', String(active));
+                });
+                updateDescriptor();
+            });
+            lorebookChoices.appendChild(button);
+        });
     };
     const renderPositionDetails = () => {
+        positionButtons.forEach((button, value) => {
+            const active = value === position.value;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
+        });
         depthRow.hidden = Number(position.value) !== 4;
     };
     const renderActiveTool = () => {
@@ -1512,47 +1526,29 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         });
         if (!response.ok) throw new Error(`Avatar upload failed (${response.status}).`);
     };
-    const renderPhotoCrop = () => {
-        Object.entries(photoCropInputs).forEach(([key, elements]) => {
-            elements.input.value = String(state.crop[key]);
-            elements.output.textContent = key === 'zoom' ? `${state.crop[key]}%` : String(state.crop[key]);
-        });
-        const geometry = getCropGeometry(state.crop, photoImage.naturalWidth, photoImage.naturalHeight, 0.75);
-        if (!geometry) return;
-        photoImage.style.width = `${100 / geometry.width}%`;
-        photoImage.style.height = `${100 / geometry.height}%`;
-        photoImage.style.left = `${-geometry.left / geometry.width * 100}%`;
-        photoImage.style.top = `${-geometry.top / geometry.height * 100}%`;
-    };
-    const makeCroppedPortrait = async file => {
-        if (!file || typeof createImageBitmap !== 'function') return file;
-        const bitmap = await createImageBitmap(file);
-        try {
-            const geometry = getCropGeometry(state.crop, bitmap.width, bitmap.height, 0.75);
-            if (!geometry) return file;
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(geometry.width * bitmap.width));
-            canvas.height = Math.max(1, Math.round(geometry.height * bitmap.height));
-            const canvasContext = canvas.getContext('2d', { alpha: false });
-            if (!canvasContext) return file;
-            canvasContext.imageSmoothingEnabled = true;
-            canvasContext.imageSmoothingQuality = 'high';
-            canvasContext.drawImage(
-                bitmap,
-                geometry.left * bitmap.width,
-                geometry.top * bitmap.height,
-                geometry.width * bitmap.width,
-                geometry.height * bitmap.height,
-                0,
-                0,
-                canvas.width,
-                canvas.height,
-            );
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            return blob ? new File([blob], 'avatar.png', { type: 'image/png' }) : file;
-        } finally {
-            bitmap.close?.();
+    const openNativeAvatarPicker = (avatarId, file = null) => {
+        const nativeInput = document.querySelector('#avatar_upload_file');
+        const overwriteInput = document.querySelector('#avatar_upload_overwrite');
+        if (!(nativeInput instanceof HTMLInputElement) || !(overwriteInput instanceof HTMLInputElement)) return false;
+        overwriteInput.value = avatarId;
+        if (file) {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            nativeInput.files = transfer.files;
+            nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
         }
+        nativeInput.addEventListener('change', () => {
+            const selectedFile = nativeInput.files?.[0];
+            if (!selectedFile) return;
+            if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+            state.objectUrl = URL.createObjectURL(selectedFile);
+            photoImage.src = state.objectUrl;
+            photoImage.hidden = false;
+            photoEmpty.hidden = true;
+        }, { once: true, capture: true });
+        nativeInput.click();
+        return true;
     };
     const applyLocks = async () => {
         for (const type of connectionButtons.keys()) {
@@ -1566,15 +1562,12 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         state.busy = false;
         state.file = null;
         state.locks.clear();
-        state.crop = { x: 50, y: 50, zoom: 100 };
         if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
         state.objectUrl = '';
         photoImage.removeAttribute('src');
         photoImage.hidden = true;
         photoEmpty.hidden = false;
         photoButton.classList.remove('has-error');
-        photoCropButton.hidden = true;
-        photoCropControls.hidden = true;
         nameDisplay.textContent = t('creatorName');
         nameDisplay.hidden = false;
         nameInput.value = '';
@@ -1584,8 +1577,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         depth.value = '2';
         role.value = '0';
         notes.value = '';
-        fillLorebooks();
         lorebook.value = '';
+        fillLorebooks();
         connectionButtons.forEach(button => {
             button.classList.remove('is-active');
             button.setAttribute('aria-pressed', 'false');
@@ -1620,10 +1613,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         position.value = String(value.position ?? 0);
         depth.value = String(value.depth ?? 2);
         role.value = String(value.role ?? 0);
+        lorebook.value = String(value.lorebook || '');
         fillLorebooks();
-        lorebook.value = [...lorebook.options].some(option => option.value === String(value.lorebook || ''))
-            ? String(value.lorebook || '')
-            : '';
         notes.value = readNotes(avatarId);
         connectionButtons.forEach((button, type) => {
             const active = Boolean(isPersonaLocked(type));
@@ -1655,18 +1646,10 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     }, { capture: true });
     panel.mppOpenPersonaEditor = openExisting;
     backButton.addEventListener('click', close);
-    photoButton.addEventListener('click', () => photoInput.click());
-    photoCropButton.addEventListener('click', event => {
-        event.stopPropagation();
-        photoCropControls.hidden = !photoCropControls.hidden;
+    photoButton.addEventListener('click', () => {
+        if (state.avatarId && openNativeAvatarPicker(state.avatarId)) return;
+        photoInput.click();
     });
-    Object.entries(photoCropInputs).forEach(([key, elements]) => {
-        elements.input.addEventListener('input', () => {
-            state.crop[key] = Number(elements.input.value);
-            renderPhotoCrop();
-        });
-    });
-    photoImage.addEventListener('load', renderPhotoCrop);
     photoInput.addEventListener('change', async () => {
         const file = photoInput.files?.[0];
         photoInput.value = '';
@@ -1678,9 +1661,6 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         photoImage.src = state.objectUrl;
         photoImage.hidden = false;
         photoEmpty.hidden = true;
-        state.crop = { x: 50, y: 50, zoom: 100 };
-        photoCropButton.hidden = false;
-        photoCropControls.hidden = false;
     });
     renameButton.addEventListener('click', () => nameInput.hidden ? startNameEdit() : finishNameEdit());
     nameInput.addEventListener('keydown', event => {
@@ -1703,13 +1683,13 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         const expanded = workspace.classList.toggle('is-description-expanded');
         expandDescription.querySelector('i').className = `fa-solid ${expanded ? 'fa-compress' : 'fa-expand'}`;
     });
-    position.addEventListener('change', () => {
+    positionButtons.forEach((button, value) => button.addEventListener('click', () => {
+        position.value = value;
         renderPositionDetails();
         updateDescriptor();
-    });
+    }));
     depth.addEventListener('input', updateDescriptor);
     role.addEventListener('change', updateDescriptor);
-    lorebook.addEventListener('change', updateDescriptor);
     description.addEventListener('input', () => {
         window.clearTimeout(descriptionTimer);
         descriptionTimer = window.setTimeout(updateDescriptor, 250);
@@ -1749,35 +1729,26 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             saveButton.disabled = true;
             saveButton.querySelector('span').textContent = t('creatorSaving');
             saveButton.querySelector('i').className = 'fa-solid fa-hourglass-half';
-            if (state.file) {
-                const croppedPortrait = await makeCroppedPortrait(state.file);
-                await uploadPortrait(avatarId, croppedPortrait);
-            }
-            power_user.personas ||= {};
-            power_user.persona_descriptions ||= {};
-            power_user.personas[avatarId] = name;
             if (isNew) {
-                power_user.persona_descriptions[avatarId] = {
-                    description: description.value,
+                await initPersona(avatarId, name, description.value, '', {
                     position: Number(position.value),
                     depth: Number(depth.value) || 0,
                     role: Number(role.value),
                     lorebook: lorebook.value,
-                    connections: [],
-                };
+                });
+                state.avatarId = avatarId;
+                power_user.persona_descriptions[avatarId].connections = [];
+                await uploadPortrait(avatarId, state.file);
             } else {
+                power_user.personas[avatarId] = name;
                 updateDescriptor();
             }
-            state.avatarId = avatarId;
             saveSettings();
+            await getUserAvatars(true, avatarId);
             await setUserAvatar(avatarId);
             await applyLocks();
             writeNotes();
-            const ctx = context();
-            const createdEvent = isNew ? (ctx?.event_types?.PERSONA_CREATED ?? ctx?.eventTypes?.PERSONA_CREATED) : null;
-            if (createdEvent && ctx?.eventSource?.emit) {
-                await ctx.eventSource.emit(createdEvent, { avatarId, name, description: description.value });
-            }
+            if (isNew && state.file) openNativeAvatarPicker(avatarId, state.file);
             state.file = null;
             workspace.classList.add('is-saved');
             saveButton.querySelector('span').textContent = t(isNew ? 'creatorSaved' : 'creatorChangesSaved');
@@ -1791,6 +1762,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
                 delete power_user.personas?.[state.avatarId];
                 delete power_user.persona_descriptions?.[state.avatarId];
                 state.avatarId = '';
+                saveSettings();
             }
             saveButton.disabled = false;
             saveButton.querySelector('span').textContent = t(isNew ? 'creatorSave' : 'creatorSaveChanges');
