@@ -809,19 +809,23 @@ function createHero(panel, nativeHeader) {
         zipInput.accept = '.zip,.json,application/zip,application/json';
         zipInput.hidden = true;
         actions.appendChild(zipInput);
-        statsButton?.addEventListener('click', event => {
+        statsButton?.addEventListener('click', async event => {
             const editorAvatarId = panel.mppPersonaEditorAvatarId?.();
             if (!panel.classList.contains('mpp-creating') || !editorAvatarId) return;
             event.preventDefault();
             event.stopImmediatePropagation();
-            showPersonaStatistics(editorAvatarId);
+            try { await showPersonaStatistics(editorAvatarId); }
+            catch (error) {
+                console.error(`[${EXTENSION_NAME}] Could not show persona statistics.`, error);
+                globalThis.toastr?.error?.(t('actionError'));
+            }
         }, { capture: true });
         backupButton?.addEventListener('click', async event => {
             event.preventDefault();
             event.stopImmediatePropagation();
             try {
                 const editorAvatarId = panel.mppPersonaEditorAvatarId?.();
-                if (panel.classList.contains('mpp-creating') && editorAvatarId) exportPersonaJson(editorAvatarId);
+                if (panel.classList.contains('mpp-creating') && editorAvatarId) await exportPersonaJson(editorAvatarId);
                 else if (!panel.classList.contains('mpp-creating')) {
                     const choice = await Popup.show.confirm(t('backupFormatTitle'), t('backupFormatHint'), {
                         okButton: t('backupZip'),
@@ -2133,9 +2137,10 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const saveSettings = () => context()?.saveSettingsDebounced?.();
     const descriptor = () => state.avatarId ? power_user.persona_descriptions?.[state.avatarId] : null;
     const runEditorAction = async (button, action) => {
-        if (button.disabled) return;
+        if (state.busy || button.disabled) return;
         button.disabled = true;
         button.classList.add('is-busy');
+        button.setAttribute('aria-busy', 'true');
         try { await action(); }
         catch (error) {
             console.error(`[${EXTENSION_NAME}] Persona editor action failed.`, error);
@@ -2143,6 +2148,9 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         } finally {
             button.disabled = false;
             button.classList.remove('is-busy');
+            button.removeAttribute('aria-busy');
+            if (state.avatarId === user_avatar) syncConnectionButtons();
+            renderEditorActions();
         }
     };
     const syncConnectionButtons = () => {
@@ -2181,6 +2189,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         const nativeList = panel.querySelector('#persona_connections_list');
         connectionPreviewInfo.replaceChildren(...[...(nativeInfo?.childNodes || [])].map(node => node.cloneNode(true)));
         connectionPreviewList.replaceChildren(...[...(nativeList?.childNodes || [])].map(node => node.cloneNode(true)));
+        connectionPreview.classList.toggle('is-empty', !connectionPreviewList.querySelector('.avatar'));
     };
     const updateDescriptor = () => {
         const value = descriptor();
