@@ -908,6 +908,12 @@
     background: color-mix(in srgb, var(--mpp-accent) 16%, var(--mpp-surface));
 }
 
+#PersonaManagement.mpp-panel .mpp-creator-actions > button:disabled,
+#PersonaManagement.mpp-panel .mpp-creator-connection:disabled {
+    cursor: progress;
+    opacity: 0.68;
+}
+
 #PersonaManagement.mpp-panel .mpp-creator-delete:hover {
     color: var(--mpp-danger);
     border-color: var(--mpp-danger);
@@ -1046,6 +1052,49 @@
     max-height: 310px;
     padding-right: 3px;
     overflow-y: auto;
+}
+
+.mpp-creator-linked {
+    display: grid;
+    min-width: 0;
+    padding: 12px;
+    gap: 9px;
+    color: var(--mpp-muted);
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--mpp-surface) 90%, transparent);
+}
+
+.mpp-creator-linked-title {
+    padding-inline: 5px;
+    color: var(--mpp-text);
+    font-size: calc(0.82rem + var(--mpp-font-adjust));
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-linked-list {
+    display: flex;
+    min-height: 52px;
+    margin: 0;
+    padding: 2px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-linked-list .avatar {
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-linked-list .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
 }
 
 #PersonaManagement.mpp-panel .mpp-open-lorebook {
@@ -1265,6 +1314,11 @@
 #PersonaManagement.mpp-panel .mpp-library-toolbar input {
     width: 100%;
     padding-inline: 10px;
+}
+
+#PersonaManagement.mpp-panel .mpp-library-toolbar #persona_sort_order {
+    width: clamp(220px, 24cqi, 320px) !important;
+    padding-inline: 10px 32px;
 }
 
 #PersonaManagement.mpp-panel .mpp-library-toolbar input::placeholder { color: var(--mpp-muted); }
@@ -1797,6 +1851,17 @@
     background: color-mix(in srgb, var(--mpp-accent) 15%, transparent) !important;
 }
 
+#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
+    .mpp-creator-tool.is-active,
+    .mpp-creator-choice.is-active,
+    .mpp-creator-connection.is-active,
+    .mpp-creator-actions > button.is-active
+) {
+    color: var(--mpp-text) !important;
+    border-color: var(--mpp-accent) !important;
+    background-color: color-mix(in srgb, var(--mpp-accent) 18%, var(--mpp-surface)) !important;
+}
+
 #PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-card-action.mpp-action-favorite.is-active {
     color: var(--mpp-warning) !important;
     border-color: var(--mpp-warning) !important;
@@ -1919,7 +1984,7 @@
 /* Desktop/laptop presentation. Coarse-pointer tablets keep the native drawer layout. */
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
     .mpp-library-toolbar {
-        grid-template-columns: minmax(160px, 1fr) auto;
+        grid-template-columns: minmax(220px, 1fr) auto;
     }
 
     #PersonaManagement.mpp-panel {

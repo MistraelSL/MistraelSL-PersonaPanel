@@ -1,7 +1,8 @@
-import { getUserAvatar, getUserAvatars, initPersona, isPersonaLocked, setPersonaDescription, setUserAvatar, togglePersonaLock, user_avatar } from '../../../personas.js';
+import { getUserAvatar, getUserAvatars, initPersona, isPersonaLocked, setPersonaDescription, setUserAvatar, togglePersonaLock, updatePersonaConnectionsAvatarList, user_avatar } from '../../../personas.js';
 import { power_user } from '../../../power-user.js';
+import { accountStorage } from '../../../util/AccountStorage.js';
 import { openWorldInfoEditor, world_names } from '../../../world-info.js';
-import { POPUP_TYPE, Popup } from '../../../popup.js';
+import { POPUP_RESULT, POPUP_TYPE, Popup } from '../../../popup.js';
 import { eventSource, event_types, getThumbnailUrl, setUserName } from '../../../../script.js';
 
 const EXTENSION_NAME = 'MistraelSL Persona Panel';
@@ -161,18 +162,23 @@ const I18N = {
         creatorCharacter: 'Character',
         creatorChat: 'Chat',
         creatorNoLorebook: 'No lorebook',
+        linkedCharacters: 'Connected characters',
         openLorebook: 'Open selected lorebook',
         activatePersona: 'Activate persona',
         makeDefault: 'Set as default persona',
         duplicatePersona: 'Duplicate persona',
         changePortrait: 'Choose and crop another portrait',
         undo: 'Undo',
-        deletePending: 'The persona will be deleted in 10 seconds.',
+        deletePending: 'The persona will be deleted in {seconds} sec.',
         deleteConfirm: 'Delete this persona?',
         deleteDetails: 'You can undo the deletion for 10 seconds.',
         backupEmpty: 'There are no personas to back up.',
         backupReady: 'Persona backup created.',
         backupFailed: 'Could not create the persona backup.',
+        backupFormatTitle: 'Backup format',
+        backupFormatHint: 'ZIP includes persona images. JSON contains persona settings without image files.',
+        backupZip: 'ZIP with images',
+        backupJson: 'JSON',
         restoreReady: 'Persona backup restored.',
         restoreFailed: 'Could not restore this persona backup.',
         sortAz: 'Alphabetical A–Z',
@@ -186,6 +192,7 @@ const I18N = {
         statsModified: 'Modified',
         statsLastUsed: 'Last used',
         statsTrackedHint: 'Usage is counted locally from this version onward.',
+        actionError: 'Could not perform this action.',
     },
     ru: {
         title: 'Панель персон',
@@ -245,18 +252,23 @@ const I18N = {
         creatorCharacter: 'Персонаж',
         creatorChat: 'Чат',
         creatorNoLorebook: 'Без лорбука',
+        linkedCharacters: 'Привязанные персонажи',
         openLorebook: 'Открыть выбранный лорбук',
         activatePersona: 'Сделать персону активной',
         makeDefault: 'Сделать персоной по умолчанию',
         duplicatePersona: 'Дублировать персону',
         changePortrait: 'Выбрать и кадрировать другое фото',
         undo: 'Вернуть',
-        deletePending: 'Персона будет удалена через 10 секунд.',
+        deletePending: 'Персона будет удалена через {seconds} сек.',
         deleteConfirm: 'Удалить эту персону?',
         deleteDetails: 'Удаление можно отменить в течение 10 секунд.',
         backupEmpty: 'Нет персон для резервной копии.',
         backupReady: 'Резервная копия персон создана.',
         backupFailed: 'Не удалось создать резервную копию персон.',
+        backupFormatTitle: 'Формат резервной копии',
+        backupFormatHint: 'ZIP включает фотографии персон. JSON содержит настройки персон без файлов изображений.',
+        backupZip: 'ZIP с фотографиями',
+        backupJson: 'JSON',
         restoreReady: 'Резервная копия персон восстановлена.',
         restoreFailed: 'Не удалось восстановить эту резервную копию.',
         sortAz: 'По алфавиту А–Я',
@@ -270,6 +282,7 @@ const I18N = {
         statsModified: 'Изменена',
         statsLastUsed: 'Последнее использование',
         statsTrackedHint: 'Использование считается локально, начиная с этой версии.',
+        actionError: 'Не удалось выполнить это действие.',
         close: 'Закрыть настройки внешнего вида',
         expand: 'Развернуть раздел',
         collapse: 'Свернуть раздел',
@@ -809,7 +822,15 @@ function createHero(panel, nativeHeader) {
             try {
                 const editorAvatarId = panel.mppPersonaEditorAvatarId?.();
                 if (panel.classList.contains('mpp-creating') && editorAvatarId) exportPersonaJson(editorAvatarId);
-                else if (!panel.classList.contains('mpp-creating')) await exportAllPersonasZip();
+                else if (!panel.classList.contains('mpp-creating')) {
+                    const choice = await Popup.show.confirm(t('backupFormatTitle'), t('backupFormatHint'), {
+                        okButton: t('backupZip'),
+                        cancelButton: t('cancelCrop'),
+                        customButtons: [{ text: t('backupJson'), result: POPUP_RESULT.CUSTOM1 }],
+                    });
+                    if (choice === POPUP_RESULT.CUSTOM1) await exportAllPersonasJson();
+                    else if (choice === POPUP_RESULT.AFFIRMATIVE) await exportAllPersonasZip();
+                }
             } catch (error) {
                 console.error(`[${EXTENSION_NAME}] Could not create persona backup.`, error);
                 globalThis.toastr?.error?.(t('backupFailed'));
@@ -965,7 +986,7 @@ function createSpotlight(panel, editorButton) {
     openEditor.addEventListener('click', async () => {
         if (currentAvatarId && typeof panel.mppOpenPersonaEditor === 'function') {
             await setUserAvatar(currentAvatarId, { toastPersonaNameChange: false });
-            panel.mppOpenPersonaEditor(currentAvatarId, personaImageUrl(currentAvatarId));
+            await panel.mppOpenPersonaEditor(currentAvatarId, personaImageUrl(currentAvatarId));
             return;
         }
         if (panel.classList.contains('mpp-editor-collapsed')) editorButton.click();
@@ -1267,7 +1288,7 @@ function createSortController({ panel, avatarBlock, searchInput, sortSelect, pag
     const state = {
         sort: options.some(([value]) => value === saved) ? saved : (power_user.persona_sort_order === 'desc' ? 'desc' : 'asc'),
         page: 1,
-        pageSize: 50,
+        pageSize: Number(accountStorage.getItem('Personas_PerPage')) || 5,
     };
     sortSelect.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
     sortSelect.value = state.sort;
@@ -1292,7 +1313,8 @@ function createSortController({ panel, avatarBlock, searchInput, sortSelect, pag
         next.addEventListener('click', () => { state.page = Math.min(pages, state.page + 1); render(); });
         last.addEventListener('click', () => { state.page = pages; render(); });
         size.addEventListener('change', () => {
-            state.pageSize = Number(size.value) || 50;
+            state.pageSize = Number(size.value) || 5;
+            accountStorage.setItem('Personas_PerPage', String(state.pageSize));
             state.page = 1;
             render();
         });
@@ -1301,6 +1323,7 @@ function createSortController({ panel, avatarBlock, searchInput, sortSelect, pag
     };
     const render = async () => {
         if (!isCustom()) return false;
+        state.pageSize = Number(accountStorage.getItem('Personas_PerPage')) || 5;
         let avatarIds = Object.keys(power_user.personas || {});
         if (!avatarIds.length) avatarIds = await getUserAvatars(false);
         const firstSeen = rememberFirstSeen(avatarIds);
@@ -1573,6 +1596,27 @@ async function exportAllPersonasZip() {
     globalThis.toastr?.success?.(t('backupReady'));
 }
 
+async function exportAllPersonasJson() {
+    const avatarIds = await getUserAvatars(false);
+    if (!Array.isArray(avatarIds) || !avatarIds.length) {
+        globalThis.toastr?.info?.(t('backupEmpty'));
+        return;
+    }
+    const personas = {};
+    const personaDescriptions = {};
+    avatarIds.forEach(avatarId => {
+        personas[avatarId] = power_user.personas?.[avatarId] ?? '';
+        personaDescriptions[avatarId] = power_user.persona_descriptions?.[avatarId] ?? { description: '', connections: [] };
+    });
+    const blob = new Blob([JSON.stringify({
+        personas,
+        persona_descriptions: personaDescriptions,
+        default_persona: power_user.default_persona ?? null,
+    }, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `personas-${backupTimestamp()}.json`);
+    globalThis.toastr?.success?.(t('backupReady'));
+}
+
 async function uploadAvatarBlob(avatarId, blob) {
     const ctx = globalThis.SillyTavern?.getContext?.();
     if (!ctx?.getRequestHeaders) throw new Error('SillyTavern request context is unavailable.');
@@ -1613,40 +1657,58 @@ async function restorePersonasZip(file, panel) {
         await eventSource.emit(event_types.PERSONA_CREATED, { avatarId: restored.at(-1), name: power_user.personas[restored.at(-1)] });
         await getUserAvatars(true, restored.at(-1));
         await panel?.mppRefresh?.();
-        if (panel?.classList.contains('mpp-creating')) panel.mppOpenPersonaEditor?.(restored.at(-1), personaImageUrl(restored.at(-1)));
+        const restoredAvatarId = restored.at(-1);
+        await setUserAvatar(restoredAvatarId, { toastPersonaNameChange: false });
+        if (panel?.classList.contains('mpp-creating')) {
+            await panel.mppOpenPersonaEditor?.(restoredAvatarId, personaImageUrl(restoredAvatarId));
+        }
     }
     globalThis.toastr?.success?.(t('restoreReady'));
 }
 
 async function restorePersonaJson(file, panel) {
     const data = JSON.parse(await file.text());
-    const entry = Object.entries(data?.personas || {})[0];
-    if (!entry) throw new Error('Persona JSON is invalid.');
-    const [sourceAvatarId, name] = entry;
-    const safeBase = String(sourceAvatarId || 'persona.png').replace(/[\\/]/g, '_');
-    const avatarId = power_user.personas?.[sourceAvatarId] === undefined
-        ? safeBase
-        : `${Date.now()}-${safeBase}`;
-    let imageBlob;
-    if (typeof data.avatar_image === 'string' && data.avatar_image.startsWith('data:image/')) {
-        imageBlob = await (await fetch(data.avatar_image)).blob();
-    } else {
-        const fallback = await fetch('/img/ai4.png');
-        if (!fallback.ok) throw new Error('Persona image is missing.');
-        imageBlob = await fallback.blob();
+    const entries = Object.entries(data?.personas || {});
+    if (!entries.length) throw new Error('Persona JSON is invalid.');
+
+    let fallbackBlob;
+    const restored = [];
+    for (const [sourceAvatarId, name] of entries) {
+        const safeBase = String(sourceAvatarId || 'persona.png').replace(/[\\/]/g, '_');
+        if (!safeBase || ['__proto__', 'prototype', 'constructor'].includes(safeBase)) continue;
+        let avatarId = safeBase;
+        let collision = 0;
+        while (power_user.personas?.[avatarId] !== undefined) {
+            collision += 1;
+            avatarId = `${Date.now()}-${collision}-${safeBase}`;
+        }
+        let imageBlob;
+        if (entries.length === 1 && typeof data.avatar_image === 'string' && data.avatar_image.startsWith('data:image/')) {
+            imageBlob = await (await fetch(data.avatar_image)).blob();
+        } else {
+            if (!fallbackBlob) {
+                const fallback = await fetch('/img/ai4.png');
+                if (!fallback.ok) throw new Error('Persona image is missing.');
+                fallbackBlob = await fallback.blob();
+            }
+            imageBlob = fallbackBlob;
+        }
+        await uploadAvatarBlob(avatarId, imageBlob);
+        power_user.personas[avatarId] = String(name || '');
+        power_user.persona_descriptions[avatarId] = data.persona_descriptions?.[sourceAvatarId] ?? { description: '', connections: [] };
+        restored.push(avatarId);
+        markPersonaModified(avatarId);
+        markPersonaImageChanged(avatarId);
+        await eventSource.emit(event_types.PERSONA_CREATED, { avatarId, name: power_user.personas[avatarId] });
     }
-    await uploadAvatarBlob(avatarId, imageBlob);
-    power_user.personas[avatarId] = String(name || '');
-    power_user.persona_descriptions[avatarId] = data.persona_descriptions?.[sourceAvatarId] ?? { description: '', connections: [] };
-    rememberFirstSeen([avatarId]);
-    markPersonaModified(avatarId);
-    markPersonaImageChanged(avatarId);
+    if (!restored.length) throw new Error('Persona JSON contains no restorable personas.');
+    rememberFirstSeen(restored);
     globalThis.SillyTavern?.getContext?.()?.saveSettingsDebounced?.();
-    await eventSource.emit(event_types.PERSONA_CREATED, { avatarId, name: power_user.personas[avatarId] });
+    const avatarId = restored.at(-1);
     await getUserAvatars(true, avatarId);
     await setUserAvatar(avatarId, { toastPersonaNameChange: false });
     await panel?.mppRefresh?.();
-    panel?.mppOpenPersonaEditor?.(avatarId, personaImageUrl(avatarId));
+    await panel?.mppOpenPersonaEditor?.(avatarId, personaImageUrl(avatarId));
 }
 
 async function duplicatePersonaThroughSillyTavern(panel, avatarId) {
@@ -1709,14 +1771,25 @@ async function schedulePersonaDeletion(panel, avatarId) {
     card?.classList.add('mpp-pending-delete');
     const notice = createElement('div', 'mpp-undo-delete');
     const copy = createElement('span');
-    copy.append(createElement('strong', '', name), document.createTextNode(` — ${t('deletePending')}`));
+    const countdown = createElement('span', 'mpp-delete-countdown');
+    let secondsLeft = 10;
+    const renderCountdown = () => {
+        countdown.textContent = ` — ${t('deletePending').replace('{seconds}', String(secondsLeft))}`;
+    };
+    copy.append(createElement('strong', '', name), countdown);
+    renderCountdown();
     const undo = createElement('button', 'mpp-button', t('undo'));
     undo.type = 'button';
     notice.append(copy, undo);
     panel.appendChild(notice);
 
     let cancelled = false;
+    const countdownTimer = window.setInterval(() => {
+        secondsLeft = Math.max(0, secondsLeft - 1);
+        renderCountdown();
+    }, 1000);
     const timer = window.setTimeout(async () => {
+        window.clearInterval(countdownTimer);
         notice.remove();
         if (cancelled) return;
         try { await deletePersonaNow(avatarId, panel); }
@@ -1729,6 +1802,7 @@ async function schedulePersonaDeletion(panel, avatarId) {
     undo.addEventListener('click', () => {
         cancelled = true;
         window.clearTimeout(timer);
+        window.clearInterval(countdownTimer);
         notice.remove();
         card?.classList.remove('mpp-pending-delete');
     }, { once: true });
@@ -1768,7 +1842,7 @@ function ensureCardActions(card) {
             const panel = card.closest(PANEL_SELECTOR);
             await setUserAvatar(avatarId, { toastPersonaNameChange: false });
             if (typeof panel?.mppOpenPersonaEditor === 'function') {
-                panel.mppOpenPersonaEditor(avatarId, card.querySelector('.avatar img')?.src || '');
+                await panel.mppOpenPersonaEditor(avatarId, card.querySelector('.avatar img')?.src || '');
                 return;
             }
             if (panel?.classList.contains('mpp-editor-collapsed')) panel.querySelector('.mpp-editor-button')?.click();
@@ -2020,6 +2094,14 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     toolStage.append(positionPanel, connectionsPanel, lorebookPanel);
     left.appendChild(toolStage);
 
+    const connectionPreview = createElement('section', 'mpp-creator-linked');
+    connectionPreview.hidden = true;
+    connectionPreview.appendChild(createElement('strong', 'mpp-creator-linked-title', t('linkedCharacters')));
+    const connectionPreviewInfo = createElement('div', 'mpp-creator-linked-info');
+    const connectionPreviewList = createElement('div', 'mpp-creator-linked-list text_muted');
+    connectionPreview.append(connectionPreviewInfo, connectionPreviewList);
+    left.appendChild(connectionPreview);
+
     const notesField = createElement('label', 'mpp-creator-field mpp-creator-notes');
     const notesTitle = createElement('strong', '', t('creatorNotes'));
     const notesHint = createElement('small', '', t('creatorNotesHint'));
@@ -2050,6 +2132,28 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     };
     const saveSettings = () => context()?.saveSettingsDebounced?.();
     const descriptor = () => state.avatarId ? power_user.persona_descriptions?.[state.avatarId] : null;
+    const runEditorAction = async (button, action) => {
+        if (button.disabled) return;
+        button.disabled = true;
+        button.classList.add('is-busy');
+        try { await action(); }
+        catch (error) {
+            console.error(`[${EXTENSION_NAME}] Persona editor action failed.`, error);
+            notify(t('actionError'));
+        } finally {
+            button.disabled = false;
+            button.classList.remove('is-busy');
+        }
+    };
+    const syncConnectionButtons = () => {
+        state.locks.clear();
+        connectionButtons.forEach((button, type) => {
+            const active = Boolean(isPersonaLocked(type));
+            if (active) state.locks.add(type);
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
+        });
+    };
     const renderEditorActions = () => {
         const hasPersona = Boolean(state.avatarId && power_user.personas?.[state.avatarId] !== undefined);
         [activateButton, defaultButton, favoriteButton, recropButton, duplicateButton, exportButton, deleteButton]
@@ -2068,6 +2172,15 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         if (statsButton) statsButton.hidden = creating;
         if (backupButton) backupButton.hidden = creating;
         if (restoreButton) restoreButton.hidden = editing;
+    };
+    const renderConnectionPreview = () => {
+        connectionPreview.hidden = !state.avatarId;
+        if (!state.avatarId) return;
+        updatePersonaConnectionsAvatarList();
+        const nativeInfo = panel.querySelector('#persona_connections_info_block');
+        const nativeList = panel.querySelector('#persona_connections_list');
+        connectionPreviewInfo.replaceChildren(...[...(nativeInfo?.childNodes || [])].map(node => node.cloneNode(true)));
+        connectionPreviewList.replaceChildren(...[...(nativeList?.childNodes || [])].map(node => node.cloneNode(true)));
     };
     const updateDescriptor = () => {
         const value = descriptor();
@@ -2159,6 +2272,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const startNameEdit = () => {
         nameDisplay.hidden = true;
         nameInput.hidden = false;
+        renameButton.classList.add('is-active');
+        renameButton.setAttribute('aria-pressed', 'true');
         nameInput.value = nameDisplay.textContent === t('creatorName') ? '' : nameDisplay.textContent;
         requestAnimationFrame(() => nameInput.focus());
     };
@@ -2167,6 +2282,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         const nextName = nameInput.value.trim();
         nameInput.hidden = true;
         nameDisplay.hidden = false;
+        renameButton.classList.remove('is-active');
+        renameButton.setAttribute('aria-pressed', 'false');
         nameDisplay.textContent = nextName || t('creatorName');
         if (state.avatarId && nextName && power_user.personas[state.avatarId] !== nextName) {
             const previousName = power_user.personas[state.avatarId] || '';
@@ -2278,6 +2395,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         nameDisplay.hidden = false;
         nameInput.value = '';
         nameInput.hidden = true;
+        renameButton.classList.remove('is-active');
+        renameButton.setAttribute('aria-pressed', 'false');
         description.value = '';
         position.value = '0';
         depth.value = '2';
@@ -2298,6 +2417,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         renderActiveTool();
         renderEditorActions();
         renderHeroContext();
+        renderConnectionPreview();
     };
     const showWorkspace = () => {
         state.previousWindowMode = panel.dataset.mppWindowMode || 'standard';
@@ -2310,9 +2430,12 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         reset();
         showWorkspace();
     };
-    const openExisting = (avatarId, imageSource = '') => {
+    const openExisting = async (avatarId, imageSource = '') => {
         const existingName = power_user.personas?.[avatarId];
         if (!avatarId || existingName === undefined) return;
+        if (user_avatar !== avatarId) {
+            await setUserAvatar(avatarId, { toastPersonaNameChange: false });
+        }
         reset();
         state.avatarId = avatarId;
         nameDisplay.textContent = existingName || t('creatorName');
@@ -2324,12 +2447,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         lorebook.value = String(value.lorebook || '');
         fillLorebooks();
         notes.value = readNotes(avatarId);
-        connectionButtons.forEach((button, type) => {
-            const active = Boolean(isPersonaLocked(type));
-            if (active) state.locks.add(type);
-            button.classList.toggle('is-active', active);
-            button.setAttribute('aria-pressed', String(active));
-        });
+        syncConnectionButtons();
         const portraitSource = imageSource || personaImageUrl(avatarId);
         if (portraitSource) {
             photoImage.src = portraitSource;
@@ -2340,6 +2458,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         renderPositionDetails();
         renderEditorActions();
         showWorkspace();
+        renderConnectionPreview();
     };
     const close = () => {
         if (state.busy) return;
@@ -2365,7 +2484,9 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             photoImage.hidden = false;
             photoEmpty.hidden = true;
         }
+        if (state.avatarId === user_avatar) syncConnectionButtons();
         renderEditorActions();
+        renderConnectionPreview();
     };
     backButton.addEventListener('click', close);
     photoButton.addEventListener('click', () => photoInput.click());
@@ -2383,38 +2504,52 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             notify(t('creatorError'));
         }
     });
-    activateButton.addEventListener('click', async () => {
+    activateButton.addEventListener('click', () => runEditorAction(activateButton, async () => {
         if (!state.avatarId) return;
         await setUserAvatar(state.avatarId);
+        syncConnectionButtons();
         await panel.mppRefresh?.();
         renderEditorActions();
-    });
-    defaultButton.addEventListener('click', async () => {
+        renderConnectionPreview();
+    }));
+    defaultButton.addEventListener('click', () => runEditorAction(defaultButton, async () => {
         if (!state.avatarId) return;
         await setUserAvatar(state.avatarId, { toastPersonaNameChange: false });
-        await togglePersonaLock('default');
+        const locked = await togglePersonaLock('default');
+        if (locked) state.locks.add('default');
+        else state.locks.delete('default');
+        connectionButtons.get('default')?.classList.toggle('is-active', locked);
+        connectionButtons.get('default')?.setAttribute('aria-pressed', String(locked));
         await panel.mppRefresh?.();
         renderEditorActions();
-    });
-    favoriteButton.addEventListener('click', async () => {
+    }));
+    favoriteButton.addEventListener('click', () => runEditorAction(favoriteButton, async () => {
         if (!state.avatarId) return;
         if (favoritePersonas.has(state.avatarId)) favoritePersonas.delete(state.avatarId);
         else favoritePersonas.add(state.avatarId);
         saveFavorites();
         await panel.mppRefresh?.();
         renderEditorActions();
-    });
-    recropButton.addEventListener('click', recropExistingPortrait);
-    duplicateButton.addEventListener('click', () => duplicatePersonaThroughSillyTavern(panel, state.avatarId));
-    exportButton.addEventListener('click', () => exportPersonaJson(state.avatarId));
-    deleteButton.addEventListener('click', async () => {
+    }));
+    recropButton.addEventListener('click', () => runEditorAction(recropButton, recropExistingPortrait));
+    duplicateButton.addEventListener('click', () => runEditorAction(duplicateButton, () => duplicatePersonaThroughSillyTavern(panel, state.avatarId)));
+    exportButton.addEventListener('click', () => runEditorAction(exportButton, () => exportPersonaJson(state.avatarId)));
+    deleteButton.addEventListener('click', () => runEditorAction(deleteButton, async () => {
         const scheduled = await schedulePersonaDeletion(panel, state.avatarId);
         if (scheduled) close();
+    }));
+    openLorebookButton.addEventListener('click', () => runEditorAction(openLorebookButton, async () => {
+        if (lorebook.value) await openWorldInfoEditor(lorebook.value);
+    }));
+    renameButton.addEventListener('pointerdown', event => {
+        if (!nameInput.hidden) event.preventDefault();
     });
-    openLorebookButton.addEventListener('click', () => {
-        if (lorebook.value) openWorldInfoEditor(lorebook.value);
+    renameButton.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (nameInput.hidden) startNameEdit();
+        else finishNameEdit();
     });
-    renameButton.addEventListener('click', () => nameInput.hidden ? startNameEdit() : finishNameEdit());
     nameInput.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
@@ -2423,6 +2558,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         if (event.key === 'Escape') {
             nameInput.hidden = true;
             nameDisplay.hidden = false;
+            renameButton.classList.remove('is-active');
+            renameButton.setAttribute('aria-pressed', 'false');
         }
     });
     nameInput.addEventListener('blur', finishNameEdit);
@@ -2453,17 +2590,19 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         descriptionTimer = window.setTimeout(updateDescriptor, 250);
     });
     notes.addEventListener('input', writeNotes);
-    connectionButtons.forEach((button, type) => button.addEventListener('click', async () => {
+    connectionButtons.forEach((button, type) => button.addEventListener('click', () => runEditorAction(button, async () => {
         const active = !state.locks.has(type);
         if (active) state.locks.add(type);
         else state.locks.delete(type);
         button.classList.toggle('is-active', active);
         button.setAttribute('aria-pressed', String(active));
         if (state.avatarId) {
-            try { await applyLocks(); }
-            catch (error) { console.warn(`[${EXTENSION_NAME}] Could not update persona connection.`, error); }
+            await applyLocks();
+            syncConnectionButtons();
+            renderConnectionPreview();
+            await panel.mppRefresh?.();
         }
-    }));
+    })));
     saveButton.addEventListener('click', async () => {
         if (state.busy) return;
         if (!nameInput.hidden) await finishNameEdit();
@@ -2588,6 +2727,26 @@ function enhancePanel(panel) {
     const searchInput = nativeToolbar?.querySelector('input[type="search"], input[type="text"]');
     const sortSelect = nativeToolbar?.querySelector('#persona_sort_order');
     const paginationContainer = panel.querySelector('#persona_pagination_container');
+    if (paginationContainer) {
+        const syncNativePageSize = () => {
+            const selectedSize = String(Number(accountStorage.getItem('Personas_PerPage')) || 5);
+            const nativeSizeSelect = paginationContainer.querySelector('.J-paginationjs-size-select');
+            if (!nativeSizeSelect) return;
+            nativeSizeSelect.value = selectedSize;
+            [...nativeSizeSelect.options].forEach(option => {
+                option.selected = option.value === selectedSize;
+            });
+        };
+        paginationContainer.addEventListener('change', event => {
+            const select = event.target.closest?.('.J-paginationjs-size-select');
+            if (!select) return;
+            accountStorage.setItem('Personas_PerPage', String(Number(select.value) || 5));
+            requestAnimationFrame(syncNativePageSize);
+        }, { capture: true });
+        new MutationObserver(() => requestAnimationFrame(syncNativePageSize))
+            .observe(paginationContainer, { childList: true, subtree: true });
+        syncNativePageSize();
+    }
     createButton?.classList.add('mpp-create-persona');
     if (searchInput) searchInput.placeholder = t('searchByPersonaName');
     if (desktopLibraryLayout && nativeToolbar) {
