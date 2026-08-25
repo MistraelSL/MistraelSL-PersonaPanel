@@ -1800,9 +1800,10 @@
 .mpp-section-body { padding-top: 9px; }
 
 /* Independent schemes beat aggressive user themes, but remain scoped here. */
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] {
     color-scheme: dark;
     color: var(--mpp-text) !important;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
     background:
         radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--mpp-accent) 18%, transparent), transparent 34%),
         radial-gradient(circle at 94% 8%, color-mix(in srgb, var(--mpp-accent) 8%, transparent), transparent 30%),
@@ -1810,22 +1811,29 @@
     text-shadow: none !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] * {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] * {
     text-shadow: none !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(
+    h1, h2, h3, h4, h5, h6, p, span, strong, small, label,
+    button, input, select, textarea, output
+) {
+    font-family: inherit !important;
+}
+
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(
     .mpp-title-row h2, .mpp-library-header h3, .mpp-spotlight-copy strong,
     .mpp-persona-card .ch_name, .mpp-setting-label, .mpp-appearance-copy strong,
     .mpp-theme-copy strong, .mpp-editor-column h4, .mpp-editor-column h5
 ) { color: var(--mpp-text) !important; text-shadow: none !important; }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(
     .mpp-brand-copy small, .mpp-appearance-copy small, .mpp-theme-copy small,
     .mpp-persona-counter, .mpp-spotlight-copy > span, .mpp-persona-card .ch_description
 ) { color: var(--mpp-muted) !important; text-shadow: none !important; }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(
     .mpp-native-actions .menu_button, .mpp-button, .mpp-filter, .mpp-card-action,
     .mpp-library-toolbar .menu_button, .mpp-library-toolbar input, .mpp-library-toolbar select,
     .mpp-editor-column .menu_button, .mpp-editor-column .text_pole,
@@ -1841,14 +1849,14 @@
     text-shadow: none !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(input, select, textarea, button) {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(input, select, textarea, button) {
     font-family: inherit !important;
     text-transform: none !important;
     text-decoration: none !important;
     filter: none !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(
     .mpp-creator, .mpp-creator-field, .mpp-creator-tool-stage, .mpp-creator-photo,
     .mpp-undo-delete
 ) {
@@ -1859,27 +1867,27 @@
     filter: none !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-theme-swatch {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-theme-swatch {
     color: var(--mpp-swatch-text, var(--mpp-text)) !important;
     border-color: var(--mpp-border) !important;
     background: color-mix(in srgb, var(--mpp-swatch-tint, var(--mpp-tint)) 78%, transparent) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-theme-swatch:is(:hover, .is-active) {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-theme-swatch:is(:hover, .is-active) {
     border-color: var(--mpp-swatch-accent, var(--mpp-accent)) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-theme-preview {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-theme-preview {
     background: var(--mpp-swatch-tint, var(--mpp-glass)) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-filter.is-active {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-filter.is-active {
     color: color-mix(in srgb, var(--mpp-accent) 76%, var(--mpp-text)) !important;
     border-color: var(--mpp-accent) !important;
     background: color-mix(in srgb, var(--mpp-accent) 15%, transparent) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(
     .mpp-creator-tool.is-active,
     .mpp-creator-choice.is-active,
     .mpp-creator-connection.is-active,
@@ -1890,23 +1898,23 @@
     background-color: color-mix(in srgb, var(--mpp-accent) 18%, var(--mpp-surface)) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-card-action.mpp-action-favorite.is-active {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-card-action.mpp-action-favorite.is-active {
     color: var(--mpp-warning) !important;
     border-color: var(--mpp-warning) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-card-action.mpp-action-delete:hover {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-card-action.mpp-action-delete:hover {
     color: var(--mpp-danger) !important;
     border-color: var(--mpp-danger) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] :is(.mpp-library-column, .mpp-editor-column, .mpp-appearance) {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(.mpp-library-column, .mpp-editor-column, .mpp-appearance) {
     color: var(--mpp-text) !important;
     border-color: var(--mpp-border) !important;
     background-color: var(--mpp-glass-strong) !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-persona-card {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-persona-card {
     color: var(--mpp-text) !important;
     border: 0 !important;
     background: color-mix(in srgb, var(--mpp-tint) 76%, transparent) !important;
@@ -1914,8 +1922,41 @@
     text-shadow: none !important;
 }
 
-#PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-persona-card.selected {
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-persona-card.selected {
     box-shadow: 0 0 0 2px var(--mpp-accent), 0 8px 24px color-mix(in srgb, var(--mpp-accent) 20%, transparent) !important;
+}
+
+/* The crop dialog lives under <body>, so it needs its own independent-theme boundary. */
+html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] {
+    color-scheme: dark;
+    color: var(--mpp-text) !important;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    background: rgba(3, 4, 8, 0.78) !important;
+    text-shadow: none !important;
+}
+
+html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] :is(
+    span, strong, small, button, input, output
+) {
+    font-family: inherit !important;
+    text-shadow: none !important;
+    filter: none !important;
+}
+
+html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-visual-crop-modal {
+    color: var(--mpp-text) !important;
+    border-color: var(--mpp-border) !important;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--mpp-accent) 10%, transparent), transparent 54%),
+        color-mix(in srgb, var(--mpp-tint) 97%, #09090d) !important;
+    box-shadow: 0 28px 74px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
+    color: var(--mpp-text) !important;
+    border-color: var(--mpp-border) !important;
+    background: color-mix(in srgb, var(--mpp-tint) 82%, transparent) !important;
+    box-shadow: none !important;
 }
 
 @keyframes mpp-popover-in {
@@ -2157,7 +2198,7 @@
         background: currentColor;
     }
 
-    #PersonaManagement.mpp-panel[data-mpp-independent='true'] .mpp-spotlight-copy > span {
+    #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-spotlight-copy > span {
         color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text)) !important;
     }
     #PersonaManagement.mpp-panel :is(.mpp-spotlight-visual-crop-button, .mpp-spotlight-crop-button) {

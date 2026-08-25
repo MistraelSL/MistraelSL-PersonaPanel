@@ -20,11 +20,14 @@ const SORT_KEY = 'MistraelSL_PersonaPanel_sort_v1';
 const PERSONA_FIRST_SEEN_KEY = 'MistraelSL_PersonaPanel_firstSeen_v1';
 const PERSONA_MODIFIED_KEY = 'MistraelSL_PersonaPanel_modified_v1';
 const PERSONA_USAGE_KEY = 'MistraelSL_PersonaPanel_usage_v1';
+const THEME_ISOLATION_STYLESHEET_ID = 'mpp-theme-isolation-stylesheet';
 
 const imageRevisions = new Map();
+let themeIsolationObserver;
+let themeIsolationQueued = false;
 
 const DEFAULT_APPEARANCE = Object.freeze({
-    theme: 'native',
+    theme: 'amethyst',
     customColor: '#a78bfa',
     glassOpacity: 86,
     fontScale: 100,
@@ -77,8 +80,8 @@ const I18N = {
         appearance: 'Appearance',
         appearanceHint: 'These settings affect only Persona Panel.',
         theme: 'Color scheme',
-        themeHint: 'SillyTavern follows the app theme. Other schemes are independent.',
-        native: 'SillyTavern',
+        themeHint: 'SillyTavern uses only the app colors. Persona Panel keeps its own layout in every scheme.',
+        native: 'SillyTavern colors',
         imperial: 'Imperial',
         amethyst: 'Amethyst',
         nord: 'Nord',
@@ -193,6 +196,13 @@ const I18N = {
         statsLastUsed: 'Last used',
         statsTrackedHint: 'Usage is counted locally from this version onward.',
         actionError: 'Could not perform this action.',
+        unnamedPersona: 'Unnamed persona',
+        noDescription: 'No description',
+        pageFirst: 'First page',
+        pagePrevious: 'Previous page',
+        pageNext: 'Next page',
+        pageLast: 'Last page',
+        perPage: 'per page',
     },
     ru: {
         title: 'Панель персон',
@@ -207,8 +217,8 @@ const I18N = {
         appearance: 'Внешний вид',
         appearanceHint: 'Эти настройки меняют только Persona Panel.',
         theme: 'Цветовая схема',
-        themeHint: 'SillyTavern наследует тему приложения. Остальные схемы независимы.',
-        native: 'SillyTavern',
+        themeHint: 'SillyTavern берёт только цвета приложения. Компоновка Persona Panel защищена в любой схеме.',
+        native: 'Цвета SillyTavern',
         imperial: 'Имперская',
         amethyst: 'Аметист',
         nord: 'Нордическая',
@@ -283,6 +293,13 @@ const I18N = {
         statsLastUsed: 'Последнее использование',
         statsTrackedHint: 'Использование считается локально, начиная с этой версии.',
         actionError: 'Не удалось выполнить это действие.',
+        unnamedPersona: 'Без имени',
+        noDescription: 'Нет описания',
+        pageFirst: 'Первая страница',
+        pagePrevious: 'Предыдущая страница',
+        pageNext: 'Следующая страница',
+        pageLast: 'Последняя страница',
+        perPage: 'на странице',
         close: 'Закрыть настройки внешнего вида',
         expand: 'Развернуть раздел',
         collapse: 'Свернуть раздел',
@@ -362,6 +379,42 @@ function createElement(tag, className = '', text) {
     if (className) element.className = className;
     if (text !== undefined) element.textContent = text;
     return element;
+}
+
+function ensureThemeIsolationStylesheet() {
+    if (!document.head) return null;
+
+    let stylesheet = document.getElementById(THEME_ISOLATION_STYLESHEET_ID);
+    if (!(stylesheet instanceof HTMLLinkElement)) {
+        stylesheet = document.createElement('link');
+        stylesheet.id = THEME_ISOLATION_STYLESHEET_ID;
+        stylesheet.rel = 'stylesheet';
+        stylesheet.dataset.mppThemeIsolation = 'true';
+        stylesheet.href = new URL('./style.css', import.meta.url).href;
+    }
+
+    // Keep the local extension stylesheet after host/user themes in the cascade.
+    if (document.head.lastElementChild !== stylesheet) document.head.appendChild(stylesheet);
+
+    if (!themeIsolationObserver) {
+        themeIsolationObserver = new MutationObserver(() => {
+            if (themeIsolationQueued) return;
+            themeIsolationQueued = true;
+            queueMicrotask(() => {
+                themeIsolationQueued = false;
+                ensureThemeIsolationStylesheet();
+            });
+        });
+        themeIsolationObserver.observe(document.head, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['href', 'media', 'disabled'],
+        });
+    }
+
+    return stylesheet;
 }
 
 function personaImageUrl(avatarId) {
@@ -617,24 +670,37 @@ function getSelectedTheme(settings) {
 }
 
 function applyAppearance(panel, settings) {
+    ensureThemeIsolationStylesheet();
     const theme = getSelectedTheme(settings);
     const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const fontAdjustment = rootFontSize * ((settings.fontScale - 100) / 100);
 
-    panel.style.setProperty('--mpp-accent', theme.accent);
-    panel.style.setProperty('--mpp-tint', theme.tint);
-    panel.style.setProperty('--mpp-text', theme.text);
-    panel.style.setProperty('--mpp-muted', theme.muted);
-    panel.style.setProperty('--mpp-border', theme.border);
-    panel.style.setProperty('--mpp-positive', theme.positive);
-    panel.style.setProperty('--mpp-warning', theme.warning);
-    panel.style.setProperty('--mpp-danger', theme.danger);
-    panel.style.setProperty('--mpp-glass-opacity', `${settings.glassOpacity}%`);
-    panel.style.setProperty('--mpp-glass-strong-opacity', `${Math.min(100, settings.glassOpacity + 9)}%`);
-    panel.style.setProperty('--mpp-font-adjust', `${fontAdjustment.toFixed(2)}px`);
+    const tokens = {
+        '--mpp-accent': theme.accent,
+        '--mpp-tint': theme.tint,
+        '--mpp-text': theme.text,
+        '--mpp-muted': theme.muted,
+        '--mpp-border': theme.border,
+        '--mpp-positive': theme.positive,
+        '--mpp-warning': theme.warning,
+        '--mpp-danger': theme.danger,
+        '--mpp-glass-opacity': `${settings.glassOpacity}%`,
+        '--mpp-glass-strong-opacity': `${Math.min(100, settings.glassOpacity + 9)}%`,
+        '--mpp-font-adjust': `${fontAdjustment.toFixed(2)}px`,
+    };
+    Object.entries(tokens).forEach(([property, value]) => {
+        panel.style.setProperty(property, value, 'important');
+    });
     panel.dataset.mppTheme = settings.theme;
-    if (settings.theme === 'native') delete panel.dataset.mppIndependent;
-    else panel.dataset.mppIndependent = 'true';
+    panel.dataset.mppIndependent = 'true';
+
+    document.querySelectorAll('.mpp-visual-crop-backdrop[data-mpp-owner="persona-panel"]').forEach(backdrop => {
+        Object.entries(tokens).forEach(([property, value]) => {
+            backdrop.style.setProperty(property, value, 'important');
+        });
+        backdrop.dataset.mppTheme = settings.theme;
+        backdrop.dataset.mppIndependent = 'true';
+    });
 }
 
 function makeRange({ label, minimum, maximum, value, onInput }) {
@@ -953,6 +1019,7 @@ function createSpotlight(panel, editorButton) {
     cropPanel.append(cropHeader, cropControls, resetCropButton);
 
     const cropModalBackdrop = createElement('div', 'mpp-visual-crop-backdrop');
+    cropModalBackdrop.dataset.mppOwner = 'persona-panel';
     cropModalBackdrop.hidden = true;
     cropModalBackdrop.tabIndex = -1;
     const cropModal = createElement('section', 'mpp-visual-crop-modal');
@@ -1102,8 +1169,10 @@ function createSpotlight(panel, editorButton) {
         stageImage.src = image.src;
         const panelStyle = getComputedStyle(panel);
         ['--mpp-text', '--mpp-muted', '--mpp-border', '--mpp-accent', '--mpp-tint'].forEach(property => {
-            cropModalBackdrop.style.setProperty(property, panelStyle.getPropertyValue(property));
+            cropModalBackdrop.style.setProperty(property, panelStyle.getPropertyValue(property), 'important');
         });
+        cropModalBackdrop.dataset.mppTheme = panel.dataset.mppTheme || '';
+        cropModalBackdrop.dataset.mppIndependent = 'true';
         cropModalBackdrop.hidden = false;
         requestAnimationFrame(() => {
             renderModalCrop(currentCrop);
@@ -1251,9 +1320,9 @@ function createPersonaCardFromTemplate(avatarBlock, avatarId) {
     const source = document.querySelector('#user_avatar_template .avatar-container');
     if (!source) return null;
     const card = source.cloneNode(true);
-    const name = power_user.personas?.[avatarId] || '[Без имени]';
+    const name = power_user.personas?.[avatarId] || `[${t('unnamedPersona')}]`;
     const descriptor = power_user.persona_descriptions?.[avatarId] || {};
-    const description = descriptor.description || avatarBlock.getAttribute('no_desc_text') || '[Нет описания]';
+    const description = descriptor.description || avatarBlock.getAttribute('no_desc_text') || `[${t('noDescription')}]`;
     card.dataset.avatarId = avatarId;
     card.hidden = false;
     card.classList.toggle('selected', avatarId === user_avatar);
@@ -1300,15 +1369,15 @@ function createSortController({ panel, avatarBlock, searchInput, sortSelect, pag
     const isCustom = () => state.sort === 'modified' || state.sort === 'created';
     const renderPager = (total, pages) => {
         const pager = createElement('div', 'mpp-custom-pager');
-        const first = createIconButton('fa-angles-left', t('sortCreated'), 'mpp-pager-button');
-        const previous = createIconButton('fa-chevron-left', t('sortCreated'), 'mpp-pager-button');
-        const next = createIconButton('fa-chevron-right', t('sortCreated'), 'mpp-pager-button');
-        const last = createIconButton('fa-angles-right', t('sortCreated'), 'mpp-pager-button');
+        const first = createIconButton('fa-angles-left', t('pageFirst'), 'mpp-pager-button');
+        const previous = createIconButton('fa-chevron-left', t('pagePrevious'), 'mpp-pager-button');
+        const next = createIconButton('fa-chevron-right', t('pageNext'), 'mpp-pager-button');
+        const last = createIconButton('fa-angles-right', t('pageLast'), 'mpp-pager-button');
         const start = total ? (state.page - 1) * state.pageSize + 1 : 0;
         const end = Math.min(total, state.page * state.pageSize);
         const label = createElement('strong', 'mpp-pager-label', `${start}–${end} / ${total}`);
         const size = createElement('select', 'mpp-pager-size');
-        [5, 10, 25, 50, 100, 250, 500, 1000].forEach(value => size.appendChild(new Option(`${value} / стр.`, String(value))));
+        [5, 10, 25, 50, 100, 250, 500, 1000].forEach(value => size.appendChild(new Option(`${value} ${t('perPage')}`, String(value))));
         size.value = String(state.pageSize);
         first.disabled = previous.disabled = state.page <= 1;
         next.disabled = last.disabled = state.page >= pages;
@@ -1822,7 +1891,16 @@ function createCardAction(icon, label, className, handler) {
     button.addEventListener('click', async event => {
         event.preventDefault();
         event.stopPropagation();
-        await handler(button);
+        if (button.disabled) return;
+        button.disabled = true;
+        try {
+            await handler(button);
+        } catch (error) {
+            console.error(`[${EXTENSION_NAME}] Persona card action failed.`, error);
+            globalThis.toastr?.error?.(t('actionError'));
+        } finally {
+            button.disabled = false;
+        }
     });
     button.addEventListener('keydown', event => event.stopPropagation());
     return button;
@@ -2210,7 +2288,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         }
         saveSettings();
         const cardDescription = panel.querySelector(`#user_avatar_block [data-avatar-id="${CSS.escape(state.avatarId)}"] .ch_description`);
-        if (cardDescription) cardDescription.textContent = value.description || '[Нет описания]';
+        if (cardDescription) cardDescription.textContent = value.description || `[${t('noDescription')}]`;
     };
     const writeNotes = () => {
         if (!state.avatarId) return;
@@ -2695,8 +2773,6 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
 
 function enhancePanel(panel) {
     if (!(panel instanceof HTMLElement) || panel.dataset.mppEnhanced === 'true') return;
-    panel.dataset.mppEnhanced = 'true';
-    panel.classList.add('mpp-panel');
 
     const shell = panel.firstElementChild;
     const nativeHeader = shell?.querySelector(':scope > .flex-container.alignItemsBaseline');
@@ -2708,6 +2784,9 @@ function enhancePanel(panel) {
         console.warn(`[${EXTENSION_NAME}] Native Persona Management structure was not recognized.`);
         return;
     }
+
+    panel.dataset.mppEnhanced = 'true';
+    panel.classList.add('mpp-panel');
 
     const { hero, settingsButton, editorButton } = createHero(panel, nativeHeader);
     const appearance = createAppearancePanel(panel, settingsButton);
@@ -2885,11 +2964,15 @@ function wirePersonaEvents() {
 }
 
 function scan(node = document) {
-    if (node instanceof Element && node.matches(PANEL_SELECTOR)) enhancePanel(node);
+    if (node instanceof Element) {
+        if (node.matches(PANEL_SELECTOR)) enhancePanel(node);
+        else enhancePanel(node.closest(PANEL_SELECTOR));
+    }
     node.querySelectorAll?.(PANEL_SELECTOR).forEach(enhancePanel);
 }
 
 function init() {
+    ensureThemeIsolationStylesheet();
     wirePersonaEvents();
     const existingPanel = document.querySelector(PANEL_SELECTOR);
     if (existingPanel) {
