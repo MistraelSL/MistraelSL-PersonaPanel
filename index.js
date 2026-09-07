@@ -3287,6 +3287,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const state = {
         activeTool: '',
         avatarId: '',
+        draftTags: [],
         busy: false,
         file: null,
         objectUrl: '',
@@ -3300,6 +3301,11 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const updateDescriptionCounter = () => {
         descriptionCounter.textContent = String(description.value.length);
     };
+    const editedTags = () => state.avatarId ? getPersonaTags(state.avatarId) : state.draftTags;
+    const updateEditedTags = tags => {
+        if (state.avatarId) setPersonaTags(state.avatarId, tags);
+        else state.draftTags = [...new Set(tags.map(tag => String(tag).trim()).filter(Boolean))];
+    };
 
     const createTagChip = tag => {
         const chip = createElement('span', 'mpp-tag-chip');
@@ -3309,7 +3315,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         remove.title = t('tagRemove');
         remove.setAttribute('aria-label', `${t('tagRemove')}: ${tag}`);
         remove.addEventListener('click', () => {
-            setPersonaTags(state.avatarId, getPersonaTags(state.avatarId).filter(item => item !== tag));
+            updateEditedTags(editedTags().filter(item => item !== tag));
             renderTagsEditor();
             panel.mppRefresh?.();
         });
@@ -3318,16 +3324,15 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     };
     const renderTagsEditor = () => {
         tagsEditor.querySelectorAll('.mpp-tag-chip').forEach(chip => chip.remove());
-        const tags = state.avatarId ? getPersonaTags(state.avatarId) : [];
+        const tags = editedTags();
         tagsEditor.prepend(...tags.map(createTagChip));
         tagsInput.value = '';
-        tagsInput.disabled = !state.avatarId;
     };
     const commitTagsInput = () => {
         const value = tagsInput.value.trim();
         tagsInput.value = '';
-        if (!value || !state.avatarId) return;
-        setPersonaTags(state.avatarId, [...getPersonaTags(state.avatarId), ...value.split(',')]);
+        if (!value) return;
+        updateEditedTags([...editedTags(), ...value.split(',')]);
         renderTagsEditor();
         panel.mppRefresh?.();
     };
@@ -3337,6 +3342,9 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         commitTagsInput();
     });
     tagsInput.addEventListener('blur', commitTagsInput);
+    tagsEditor.addEventListener('click', event => {
+        if (event.target === tagsEditor) tagsInput.focus();
+    });
 
     const context = () => globalThis.SillyTavern?.getContext?.();
     const notify = (message, type = 'error') => {
@@ -3619,6 +3627,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const reset = () => {
         state.activeTool = '';
         state.avatarId = '';
+        state.draftTags = [];
         state.busy = false;
         state.file = null;
         state.cropData = null;
@@ -3856,6 +3865,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     })));
     saveButton.addEventListener('click', async () => {
         if (state.busy) return;
+        commitTagsInput();
         if (!nameInput.hidden) await finishNameEdit();
         const name = nameDisplay.textContent.trim();
         if (!name || name === t('creatorName')) {
@@ -3902,6 +3912,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             await setUserAvatar(avatarId);
             await applyLocks();
             writeNotes();
+            if (isNew) setPersonaTags(avatarId, state.draftTags);
             state.file = null;
             state.cropData = null;
             workspace.classList.add('is-saved');
@@ -3915,6 +3926,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         } catch (error) {
             console.error(`[${EXTENSION_NAME}] Could not create persona.`, error);
             if (isNew && state.avatarId) {
+                setPersonaTags(state.avatarId, []);
                 delete power_user.personas?.[state.avatarId];
                 delete power_user.persona_descriptions?.[state.avatarId];
                 state.avatarId = '';
