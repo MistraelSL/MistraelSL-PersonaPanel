@@ -6,7 +6,11 @@ import { POPUP_RESULT, POPUP_TYPE, Popup } from '../../../popup.js';
 import { eventSource, event_types, getThumbnailUrl, setUserName } from '../../../../script.js';
 
 const EXTENSION_NAME = 'MistraelSL Persona Panel';
+// Match the desktop CSS: tablets share the PC layout; short touch screens keep the phone layout.
+const DESKTOP_LAYOUT_QUERY = '(min-width: 768px) and (min-height: 541px), (min-width: 768px) and (pointer: fine)';
 const PANEL_SELECTOR = '#PersonaManagement';
+const GLOBAL_LAUNCHER_ID = 'mpp-global-persona-launcher';
+const LAUNCHER_POSITION_KEY = 'MistraelSL_PersonaPanel_launcherPosition_v1';
 const STORAGE_KEY = 'mistraelsl-persona-panel:appearance';
 const GLOBAL_SECTION_KEY = 'mistraelsl-persona-panel:global-expanded';
 const EDITOR_SECTION_KEY = 'mistraelsl-persona-panel:editor-expanded-v3';
@@ -20,6 +24,7 @@ const SORT_KEY = 'MistraelSL_PersonaPanel_sort_v1';
 const PERSONA_FIRST_SEEN_KEY = 'MistraelSL_PersonaPanel_firstSeen_v1';
 const PERSONA_MODIFIED_KEY = 'MistraelSL_PersonaPanel_modified_v1';
 const PERSONA_USAGE_KEY = 'MistraelSL_PersonaPanel_usage_v1';
+const PERSONA_TAGS_KEY = 'MistraelSL_PersonaPanel_tags_v1';
 const THEME_ISOLATION_STYLESHEET_ID = 'mpp-theme-isolation-stylesheet';
 
 const imageRevisions = new Map();
@@ -31,6 +36,7 @@ const DEFAULT_APPEARANCE = Object.freeze({
     customColor: '#a78bfa',
     glassOpacity: 86,
     fontScale: 100,
+    launcherEnabled: true,
 });
 
 const THEMES = Object.freeze({
@@ -70,6 +76,7 @@ const I18N = {
     en: {
         title: 'Persona Panel',
         library: 'Persona library',
+        editShort: 'Edit',
         personaOne: 'persona',
         personaFew: 'personas',
         personaMany: 'personas',
@@ -89,6 +96,7 @@ const I18N = {
         customColor: 'Custom accent color',
         glass: 'Glass visibility',
         font: 'Text size',
+        launcherToggle: 'Floating quick-switch button',
         reset: 'Reset appearance',
         close: 'Close appearance settings',
         expand: 'Expand section',
@@ -101,6 +109,13 @@ const I18N = {
         filters: 'Persona filters',
         selectedPersona: 'Current persona',
         noSelection: 'Select a persona to see its details',
+        quickSwitch: 'Quick persona switch',
+        quickSwitchHint: 'Type to search. Enter selects the first result, Esc closes.',
+        openPanel: 'Open persona panel',
+        recentPersonas: 'Recent',
+        noPersonasFound: 'No personas found.',
+        quickActions: 'Persona actions',
+        closeQuickSwitch: 'Close quick switch',
         showEditor: 'Show persona editor',
         hideEditor: 'Hide persona editor',
         closePanel: 'Close persona panel',
@@ -112,6 +127,7 @@ const I18N = {
         crimson: 'Crimson',
         favorite: 'Add to favorites',
         favorites: 'Favorites',
+        favoriteShort: 'Favorite',
         unfavorite: 'Remove from favorites',
         editPersona: 'Edit persona',
         deletePersona: 'Delete persona',
@@ -203,10 +219,42 @@ const I18N = {
         pageNext: 'Next page',
         pageLast: 'Last page',
         perPage: 'per page',
+        cleanupTitle: 'Library cleanup',
+        cleanupHint: 'Duplicates, empty and dusty personas. Protected personas cannot be selected.',
+        cleanupDaysLabel: 'Dust threshold',
+        cleanupDays: '{days} days',
+        cleanupBackup: 'Backup (ZIP)',
+        cleanupSelectGroup: 'Select group',
+        cleanupEmpty: 'No description',
+        cleanupDusty: 'Dusty',
+        cleanupSelected: 'Selected: {count}',
+        cleanupExportSelected: 'Export selected (JSON)',
+        cleanupDeleteSelected: 'Delete selected',
+        cleanupDeleteConfirm: 'Delete selected personas?',
+        cleanupDeleteHint: 'Deletion is permanent. A ZIP backup is one click above.',
+        cleanupDeleted: 'Deleted: {count}.',
+        cleanupProtected: 'Protected',
+        cleanupLastUsed: 'last used',
+        cleanupNoDesc: 'no description',
+        cleanupLinked: 'links',
+        cleanupDuplicatesHint: 'Same name. The most recently used sits on top.',
+        cleanupEmptyHint: 'No description, no links, not the default persona.',
+        cleanupDustyHint: 'Not used for longer than the selected period. No links, not favorite, not default.',
+        cleanupClean: 'Nothing to clean up — the library is tidy.',
+        cleanupDetails: 'Details',
+        cleanupOpenInEditor: 'Open in editor',
+        cleanupKeepNewest: 'Keep newest',
+        cleanupEditActivates: 'Opening the editor switches the active persona. You will return here when it closes.',
+        tags: 'Tags',
+        tagsHint: 'Enter or comma adds a tag. Tags show up on cards and in the library filters.',
+        tagAdd: 'Add tag…',
+        tagRemove: 'Remove tag',
+        tagCardFilter: 'Filter by tag: {tag}',
     },
     ru: {
         title: 'Панель персон',
         library: 'Библиотека персон',
+        editShort: 'Править',
         personaOne: 'персона',
         personaFew: 'персоны',
         personaMany: 'персон',
@@ -226,6 +274,7 @@ const I18N = {
         customColor: 'Свой цвет акцента',
         glass: 'Видимость стекла',
         font: 'Размер текста',
+        launcherToggle: 'Плавающая кнопка быстрого выбора',
         reset: 'Сбросить оформление',
         createWorkspace: 'Создание персоны',
         creatorBack: 'Назад к библиотеке персон',
@@ -300,6 +349,37 @@ const I18N = {
         pageNext: 'Следующая страница',
         pageLast: 'Последняя страница',
         perPage: 'на странице',
+        cleanupTitle: 'Уборка библиотеки',
+        cleanupHint: 'Дубликаты, пустышки и пыльные персоны. Защищённых выбрать нельзя.',
+        cleanupDaysLabel: 'Порог пыли',
+        cleanupDays: '{days} дней',
+        cleanupBackup: 'Бэкап (ZIP)',
+        cleanupSelectGroup: 'Выбрать группу',
+        cleanupEmpty: 'Без описания',
+        cleanupDusty: 'Пыльные',
+        cleanupSelected: 'Выбрано: {count}',
+        cleanupExportSelected: 'Экспорт выбранных (JSON)',
+        cleanupDeleteSelected: 'Удалить выбранные',
+        cleanupDeleteConfirm: 'Удалить выбранные персоны?',
+        cleanupDeleteHint: 'Удаление необратимо. ZIP-бэкап — кнопкой выше.',
+        cleanupDeleted: 'Удалено: {count}.',
+        cleanupProtected: 'Защищена',
+        cleanupLastUsed: 'последний раз',
+        cleanupNoDesc: 'нет описания',
+        cleanupLinked: 'привязки',
+        cleanupDuplicatesHint: 'Одинаковые имена. Самая свежая — сверху.',
+        cleanupEmptyHint: 'Без описания, без привязок, не дефолтные.',
+        cleanupDustyHint: 'Не использовались дольше выбранного срока. Без привязок, не избранные, не дефолтные.',
+        cleanupClean: 'Убирать нечего — библиотека чистая.',
+        cleanupDetails: 'Подробнее',
+        cleanupOpenInEditor: 'Открыть в редакторе',
+        cleanupKeepNewest: 'Оставить свежую',
+        cleanupEditActivates: 'Открытие редактора сделает эту персону активной. После его закрытия вы вернётесь сюда.',
+        tags: 'Теги',
+        tagsHint: 'Enter или запятая добавляет тег. Теги появляются на карточках и в фильтрах библиотеки.',
+        tagAdd: 'Добавить тег…',
+        tagRemove: 'Убрать тег',
+        tagCardFilter: 'Фильтр по тегу: {tag}',
         close: 'Закрыть настройки внешнего вида',
         expand: 'Развернуть раздел',
         collapse: 'Свернуть раздел',
@@ -311,6 +391,13 @@ const I18N = {
         filters: 'Фильтры персон',
         selectedPersona: 'Текущая персона',
         noSelection: 'Выберите персону, чтобы увидеть подробности',
+        quickSwitch: 'Быстрый выбор персоны',
+        quickSwitchHint: 'Введите имя. Enter выбирает первый результат, Esc закрывает.',
+        openPanel: 'Открыть панель персон',
+        recentPersonas: 'Недавние',
+        noPersonasFound: 'Ничего не найдено.',
+        quickActions: 'Действия персоны',
+        closeQuickSwitch: 'Закрыть быстрый выбор',
         showEditor: 'Показать редактор персоны',
         hideEditor: 'Скрыть редактор персоны',
         closePanel: 'Закрыть панель персон',
@@ -322,6 +409,7 @@ const I18N = {
         crimson: 'Багровая',
         favorite: 'Добавить в избранное',
         favorites: 'Избранные',
+        favoriteShort: 'Избранная',
         unfavorite: 'Убрать из избранного',
         editPersona: 'Редактировать персону',
         deletePersona: 'Удалить персону',
@@ -512,6 +600,10 @@ function recordPersonaUse(avatarId, { message = false } = {}) {
     localStorage.setItem(PERSONA_USAGE_KEY, JSON.stringify(usage));
 }
 
+// Inspection flows switch the active persona behind the user's back; those switches must not
+// count as "usage", otherwise inspected personas drop out of the cleanup lists.
+let skipNextUsageRecord = false;
+
 function formatStatDate(timestamp) {
     const value = Number(timestamp || 0);
     return value ? new Intl.DateTimeFormat(getLanguage() === 'ru' ? 'ru-RU' : 'en-US', {
@@ -555,6 +647,402 @@ const favoritePersonas = loadFavorites();
 
 function saveFavorites() {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoritePersonas]));
+}
+
+function loadPersonaTags() {
+    try {
+        const value = JSON.parse(localStorage.getItem(PERSONA_TAGS_KEY) || '{}');
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch {
+        return {};
+    }
+}
+
+const personaTags = loadPersonaTags();
+
+function savePersonaTags() {
+    localStorage.setItem(PERSONA_TAGS_KEY, JSON.stringify(personaTags));
+}
+
+function getPersonaTags(avatarId) {
+    const list = personaTags[avatarId];
+    return Array.isArray(list) ? list : [];
+}
+
+function setPersonaTags(avatarId, tags) {
+    if (!avatarId) return;
+    const clean = [...new Set(tags.map(tag => String(tag).trim()).filter(Boolean))];
+    if (clean.length) personaTags[avatarId] = clean;
+    else delete personaTags[avatarId];
+    savePersonaTags();
+}
+
+function allUsedTags() {
+    const found = new Set();
+    Object.values(personaTags).forEach(list => {
+        if (Array.isArray(list)) list.forEach(tag => found.add(tag));
+    });
+    const locale = getLanguage() === 'ru' ? 'ru' : 'en';
+    return [...found].sort((left, right) => left.localeCompare(right, locale));
+}
+
+let globalPersonaLauncher;
+
+function ensureGlobalPersonaLauncher() {
+    if (globalPersonaLauncher?.isConnected) return globalPersonaLauncher;
+    const existing = document.getElementById(GLOBAL_LAUNCHER_ID);
+    if (existing) {
+        globalPersonaLauncher = existing;
+        return existing;
+    }
+
+    const root = createElement('div', 'mpp-global-persona-launcher');
+    root.id = GLOBAL_LAUNCHER_ID;
+
+    const button = createElement('button', 'mpp-global-persona-button');
+    button.type = 'button';
+    button.setAttribute('aria-haspopup', 'dialog');
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-label', t('quickSwitch'));
+    const buttonImage = createElement('img');
+    buttonImage.alt = '';
+    buttonImage.hidden = true;
+    buttonImage.draggable = false;
+    const buttonFallback = createElement('span', 'mpp-global-persona-fallback', '?');
+    button.append(buttonImage, buttonFallback);
+
+    const popover = createElement('section', 'mpp-global-persona-popover');
+    popover.hidden = true;
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-label', t('quickSwitch'));
+    const head = createElement('header', 'mpp-global-persona-head');
+    const titleCopy = createElement('span', 'mpp-global-persona-title');
+    titleCopy.append(createElement('strong', '', t('quickSwitch')), createElement('small', '', t('quickSwitchHint')));
+    const openPanelButton = createElement('button', 'mpp-global-persona-open');
+    openPanelButton.type = 'button';
+    openPanelButton.title = t('openPanel');
+    openPanelButton.setAttribute('aria-label', t('openPanel'));
+    openPanelButton.appendChild(createElement('i', 'fa-solid fa-masks-theater'));
+    const closeButton = createElement('button', 'mpp-global-persona-close');
+    closeButton.type = 'button';
+    closeButton.title = t('closeQuickSwitch');
+    closeButton.setAttribute('aria-label', t('closeQuickSwitch'));
+    closeButton.appendChild(createElement('i', 'fa-solid fa-xmark'));
+    const headActions = createElement('span', 'mpp-global-persona-head-actions');
+    headActions.append(openPanelButton, closeButton);
+    head.append(titleCopy, headActions);
+    const search = createElement('input', 'mpp-global-persona-search');
+    search.type = 'search';
+    search.placeholder = t('searchByPersonaName');
+    search.setAttribute('aria-label', t('searchByPersonaName'));
+    const recent = createElement('div', 'mpp-global-persona-recent');
+    recent.hidden = true;
+    const recentList = createElement('div', 'mpp-global-persona-recent-list');
+    recent.append(createElement('small', '', t('recentPersonas')), recentList);
+    const list = createElement('div', 'mpp-global-persona-list');
+    list.setAttribute('role', 'listbox');
+    popover.append(head, search, recent, list);
+    root.append(button, popover);
+    document.body.appendChild(root);
+    // Wear the saved panel theme from the start, not only after the panel was opened once.
+    applyAppearanceTokens(root, getAppearanceTokens(getAppearance()));
+
+    let isOpen = false;
+    let searchTimer;
+
+    const readLauncherPosition = () => {
+        try {
+            const value = JSON.parse(localStorage.getItem(LAUNCHER_POSITION_KEY) || 'null');
+            if (value && Number.isFinite(Number(value.left)) && Number.isFinite(Number(value.top))) return value;
+        } catch {
+            // Ignore a broken saved position and fall back to the default corner.
+        }
+        return null;
+    };
+    const clampLauncherPosition = (left, top) => {
+        const rect = root.getBoundingClientRect();
+        const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+        const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+        return {
+            left: Math.min(maxLeft, Math.max(8, left)),
+            top: Math.min(maxTop, Math.max(8, top)),
+        };
+    };
+    const applyLauncherPosition = position => {
+        if (!position) return;
+        const next = clampLauncherPosition(Number(position.left), Number(position.top));
+        root.style.left = `${next.left}px`;
+        root.style.top = `${next.top}px`;
+        root.style.right = 'auto';
+        root.style.bottom = 'auto';
+    };
+    const saveLauncherPosition = () => {
+        const rect = root.getBoundingClientRect();
+        const next = clampLauncherPosition(rect.left, rect.top);
+        localStorage.setItem(LAUNCHER_POSITION_KEY, JSON.stringify(next));
+    };
+    applyLauncherPosition(readLauncherPosition());
+
+    const stateText = avatarId => {
+        const connections = power_user.persona_descriptions?.[avatarId]?.connections;
+        const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
+        return [
+            avatarId === user_avatar ? t('active') : '',
+            avatarId === power_user.default_persona ? t('default') : '',
+            chatPersona === avatarId ? t('chat') : '',
+            Array.isArray(connections) && connections.length ? t('character') : '',
+            favoritePersonas.has(avatarId) ? t('favoriteShort') : '',
+        ].filter(Boolean).join(' • ');
+    };
+
+    const updateButton = () => {
+        const hasPersona = Boolean(user_avatar && power_user.personas?.[user_avatar] !== undefined);
+        const source = hasPersona ? personaThumbnailUrl(user_avatar) : '';
+        if (buttonImage.getAttribute('src') !== source) buttonImage.src = source;
+        buttonImage.hidden = !hasPersona;
+        buttonFallback.hidden = hasPersona;
+        const personaName = hasPersona ? power_user.personas[user_avatar] : '';
+        button.title = personaName ? `${t('quickSwitch')}: ${personaName}` : t('quickSwitch');
+        button.setAttribute('aria-label', button.title);
+    };
+
+    const createPersonaButton = (avatarId, compact = false) => {
+        const item = createElement('button', `mpp-global-persona-item${compact ? ' is-compact' : ''}`);
+        item.type = 'button';
+        item.dataset.avatarId = avatarId;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(avatarId === user_avatar));
+        const image = createElement('img');
+        image.src = personaThumbnailUrl(avatarId);
+        image.alt = '';
+        image.loading = 'lazy';
+        image.draggable = false;
+        const copy = createElement('span', 'mpp-global-persona-item-copy');
+        copy.append(
+            createElement('strong', '', power_user.personas?.[avatarId] || avatarId || t('unnamedPersona')),
+            createElement('small', '', stateText(avatarId) || `[${t('noDescription')}]`),
+        );
+        const check = createElement('i', 'fa-solid fa-circle-check');
+        check.setAttribute('aria-hidden', 'true');
+        check.hidden = avatarId !== user_avatar;
+        item.append(image, copy, check);
+        item.addEventListener('click', async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (item.disabled) return;
+            item.disabled = true;
+            try {
+                await setUserAvatar(avatarId);
+                setOpen(false);
+                updateButton();
+            } catch (error) {
+                console.error(`[${EXTENSION_NAME}] Could not switch persona from launcher.`, error);
+                globalThis.toastr?.error?.(t('actionError'));
+            } finally {
+                item.disabled = false;
+            }
+        });
+        return item;
+    };
+
+    const render = async () => {
+        let avatarIds = Object.keys(power_user.personas || {});
+        if (!avatarIds.length) avatarIds = await getUserAvatars(false);
+        avatarIds = [...new Set(avatarIds)].filter(Boolean);
+        const query = search.value.trim().toLocaleLowerCase();
+        const locale = getLanguage() === 'ru' ? 'ru' : 'en';
+        const nameOf = avatarId => String(power_user.personas?.[avatarId] || avatarId || '');
+        const matchesQuery = avatarId => !query || nameOf(avatarId).toLocaleLowerCase().includes(query);
+        const sorted = avatarIds
+            .filter(matchesQuery)
+            .sort((left, right) => Number(favoritePersonas.has(right)) - Number(favoritePersonas.has(left))
+                || nameOf(left).localeCompare(nameOf(right), locale));
+        const usage = loadPersonaUsage();
+        const recentIds = Object.entries(usage)
+            .map(([avatarId, item]) => [avatarId, Number(item?.lastUsed || 0)])
+            .filter(([avatarId]) => avatarIds.includes(avatarId) && matchesQuery(avatarId))
+            .sort((left, right) => right[1] - left[1] || nameOf(left[0]).localeCompare(nameOf(right[0]), locale))
+            .map(([avatarId]) => avatarId)
+            .filter(avatarId => avatarId !== user_avatar)
+            .slice(0, 5);
+        recentList.replaceChildren(...recentIds.map(avatarId => createPersonaButton(avatarId, true)));
+        recent.hidden = recentIds.length === 0;
+        if (!sorted.length) {
+            list.replaceChildren(createElement('div', 'mpp-global-persona-empty', t('noPersonasFound')));
+            return;
+        }
+        list.replaceChildren(...sorted.map(avatarId => createPersonaButton(avatarId)));
+    };
+
+    const updatePopoverPlacement = () => {
+        if (popover.hidden) return;
+        const viewport = window.visualViewport;
+        const left = (viewport?.offsetLeft || 0) + 8;
+        const top = (viewport?.offsetTop || 0) + 8;
+        const width = (viewport?.width || window.innerWidth) - 16;
+        const height = (viewport?.height || window.innerHeight) - 16;
+        popover.style.maxWidth = `${Math.max(0, width)}px`;
+        popover.style.maxHeight = `min(540px, ${Math.max(0, height)}px)`;
+        const rootRect = root.getBoundingClientRect();
+        const popoverRect = popover.getBoundingClientRect();
+        const above = rootRect.top - popoverRect.height - 10;
+        const preferredTop = above >= top ? above : rootRect.bottom + 10;
+        // Either side of a dragged launcher may be too short. Clamp the final box,
+        // including when the phone keyboard reduces the visual viewport.
+        const x = Math.max(left, Math.min(rootRect.right - popoverRect.width, left + width - popoverRect.width));
+        const y = Math.max(top, Math.min(preferredTop, top + height - popoverRect.height));
+        popover.style.right = 'auto';
+        popover.style.bottom = 'auto';
+        popover.style.left = `${x - rootRect.left}px`;
+        popover.style.top = `${y - rootRect.top}px`;
+    };
+
+    const setOpen = open => {
+        isOpen = Boolean(open);
+        popover.hidden = !isOpen;
+        button.setAttribute('aria-expanded', String(isOpen));
+        root.classList.toggle('is-open', isOpen);
+        if (!isOpen) return;
+        requestAnimationFrame(updatePopoverPlacement);
+        render()
+            .then(() => {
+                search.focus();
+                updatePopoverPlacement();
+            })
+            .catch(error => console.error(`[${EXTENSION_NAME}] Could not render global persona launcher.`, error));
+    };
+
+    let dragState = null;
+    let suppressNextClick = false;
+    button.addEventListener('dragstart', event => event.preventDefault());
+    button.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        const rect = root.getBoundingClientRect();
+        dragState = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            left: rect.left,
+            top: rect.top,
+            moved: false,
+        };
+        button.setPointerCapture(event.pointerId);
+    });
+    button.addEventListener('pointermove', event => {
+        if (!dragState || event.pointerId !== dragState.pointerId) return;
+        const deltaX = event.clientX - dragState.startX;
+        const deltaY = event.clientY - dragState.startY;
+        if (!dragState.moved && Math.hypot(deltaX, deltaY) < 5) return;
+        if (!dragState.moved) {
+            dragState.moved = true;
+            root.classList.add('is-dragging');
+            if (isOpen) setOpen(false);
+        }
+        const next = clampLauncherPosition(dragState.left + deltaX, dragState.top + deltaY);
+        root.style.left = `${next.left}px`;
+        root.style.top = `${next.top}px`;
+        root.style.right = 'auto';
+        root.style.bottom = 'auto';
+        event.preventDefault();
+    });
+    const finishDrag = event => {
+        if (!dragState || event.pointerId !== dragState.pointerId) return;
+        const moved = dragState.moved;
+        dragState = null;
+        root.classList.remove('is-dragging');
+        if (!moved) return;
+        saveLauncherPosition();
+        suppressNextClick = true;
+        window.setTimeout(() => {
+            suppressNextClick = false;
+        }, 120);
+    };
+    button.addEventListener('pointerup', finishDrag);
+    button.addEventListener('pointercancel', finishDrag);
+    button.addEventListener('click', event => {
+        if (suppressNextClick) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressNextClick = false;
+            return;
+        }
+        setOpen(!isOpen);
+    });
+    closeButton.addEventListener('click', () => setOpen(false));
+    openPanelButton.addEventListener('click', () => {
+        const panel = document.querySelector(PANEL_SELECTOR);
+        if (!panel?.classList.contains('openDrawer')) {
+            document.querySelector('#persona-management-button .drawer-toggle')?.click();
+        }
+        setOpen(false);
+    });
+    search.addEventListener('input', () => {
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(() => {
+            render().catch(error => console.error(`[${EXTENSION_NAME}] Could not filter global persona launcher.`, error));
+        }, 60);
+    });
+    popover.addEventListener('keydown', event => {
+        const items = [...popover.querySelectorAll('.mpp-global-persona-item:not([hidden])')];
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            setOpen(false);
+            button.focus();
+            return;
+        }
+        if (event.key === 'Enter' && event.target === search) {
+            event.preventDefault();
+            items[0]?.click();
+            return;
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        if (!items.length) return;
+        event.preventDefault();
+        const currentIndex = items.indexOf(document.activeElement);
+        const nextIndex = event.key === 'ArrowDown'
+            ? (currentIndex < 0 ? 0 : Math.min(items.length - 1, currentIndex + 1))
+            : (currentIndex < 0 ? items.length - 1 : Math.max(0, currentIndex - 1));
+        items[nextIndex]?.focus();
+    });
+    document.addEventListener('pointerdown', event => {
+        if (!isOpen || root.contains(event.target)) return;
+        setOpen(false);
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !isOpen) return;
+        event.preventDefault();
+        setOpen(false);
+        button.focus();
+    });
+    window.addEventListener('resize', () => {
+        applyLauncherPosition(readLauncherPosition());
+        updatePopoverPlacement();
+    });
+    window.visualViewport?.addEventListener('resize', updatePopoverPlacement);
+    window.visualViewport?.addEventListener('scroll', updatePopoverPlacement);
+    new ResizeObserver(updatePopoverPlacement).observe(popover);
+
+    root.mppUpdate = () => {
+        updateButton();
+        if (isOpen) render().catch(error => console.error(`[${EXTENSION_NAME}] Could not refresh global persona launcher.`, error));
+    };
+    root.mppSetEnabled = enabled => {
+        const isEnabled = Boolean(enabled);
+        root.classList.toggle('is-hidden', !isEnabled);
+        if (!isEnabled && isOpen) setOpen(false);
+    };
+    updateButton();
+    root.mppSetEnabled(getAppearance().launcherEnabled);
+    globalPersonaLauncher = root;
+    return root;
+}
+
+function applyLauncherVisibility(enabled) {
+    ensureGlobalPersonaLauncher()?.mppSetEnabled?.(enabled);
+}
+
+function updateGlobalPersonaLauncher() {
+    ensureGlobalPersonaLauncher()?.mppUpdate?.();
 }
 
 function loadPortraitCrops() {
@@ -648,6 +1136,7 @@ function getAppearance() {
         customColor: normalizeColor(stored.customColor),
         glassOpacity: clampNumber(stored.glassOpacity, 65, 98, DEFAULT_APPEARANCE.glassOpacity),
         fontScale: clampNumber(stored.fontScale, 90, 120, DEFAULT_APPEARANCE.fontScale),
+        launcherEnabled: typeof stored.launcherEnabled === 'boolean' ? stored.launcherEnabled : DEFAULT_APPEARANCE.launcherEnabled,
     };
 }
 
@@ -669,13 +1158,12 @@ function getSelectedTheme(settings) {
     };
 }
 
-function applyAppearance(panel, settings) {
-    ensureThemeIsolationStylesheet();
+function getAppearanceTokens(settings) {
     const theme = getSelectedTheme(settings);
     const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const fontAdjustment = rootFontSize * ((settings.fontScale - 100) / 100);
 
-    const tokens = {
+    return {
         '--mpp-accent': theme.accent,
         '--mpp-tint': theme.tint,
         '--mpp-text': theme.text,
@@ -688,19 +1176,30 @@ function applyAppearance(panel, settings) {
         '--mpp-glass-strong-opacity': `${Math.min(100, settings.glassOpacity + 9)}%`,
         '--mpp-font-adjust': `${fontAdjustment.toFixed(2)}px`,
     };
+}
+
+function applyAppearanceTokens(element, tokens) {
     Object.entries(tokens).forEach(([property, value]) => {
-        panel.style.setProperty(property, value, 'important');
+        element.style.setProperty(property, value, 'important');
     });
+}
+
+function applyAppearance(panel, settings) {
+    ensureThemeIsolationStylesheet();
+    const tokens = getAppearanceTokens(settings);
+    applyAppearanceTokens(panel, tokens);
     panel.dataset.mppTheme = settings.theme;
     panel.dataset.mppIndependent = 'true';
 
     document.querySelectorAll('.mpp-visual-crop-backdrop[data-mpp-owner="persona-panel"]').forEach(backdrop => {
-        Object.entries(tokens).forEach(([property, value]) => {
-            backdrop.style.setProperty(property, value, 'important');
-        });
+        applyAppearanceTokens(backdrop, tokens);
         backdrop.dataset.mppTheme = settings.theme;
         backdrop.dataset.mppIndependent = 'true';
     });
+
+    // The floating launcher is var-driven too: let it wear the panel's theme.
+    const launcher = document.getElementById(GLOBAL_LAUNCHER_ID);
+    if (launcher) applyAppearanceTokens(launcher, tokens);
 }
 
 function makeRange({ label, minimum, maximum, value, onInput }) {
@@ -807,6 +1306,21 @@ function createAppearancePanel(panel, settingsButton) {
             applyAppearance(panel, settings);
         },
     });
+    const launcherRow = createElement('label', 'mpp-setting-row');
+    launcherRow.appendChild(createElement('span', 'mpp-setting-label', t('launcherToggle')));
+    const launcherToggle = createElement('input', 'mpp-toggle');
+    launcherToggle.type = 'checkbox';
+    launcherToggle.checked = settings.launcherEnabled;
+    launcherToggle.setAttribute('role', 'switch');
+    launcherToggle.setAttribute('aria-label', t('launcherToggle'));
+    launcherToggle.setAttribute('aria-checked', String(settings.launcherEnabled));
+    launcherToggle.addEventListener('change', () => {
+        settings.launcherEnabled = launcherToggle.checked;
+        launcherToggle.setAttribute('aria-checked', String(settings.launcherEnabled));
+        saveAppearance(settings);
+        applyLauncherVisibility(settings.launcherEnabled);
+    });
+    launcherRow.appendChild(launcherToggle);
     const resetButton = createElement('button', 'mpp-button mpp-reset');
     resetButton.type = 'button';
     resetButton.append(createElement('i', 'fa-solid fa-arrow-rotate-left'), createElement('span', '', t('reset')));
@@ -815,6 +1329,9 @@ function createAppearancePanel(panel, settingsButton) {
         const defaults = getAppearance();
         Object.assign(settings, defaults);
         applyAppearance(panel, settings);
+        launcherToggle.checked = settings.launcherEnabled;
+        launcherToggle.setAttribute('aria-checked', String(settings.launcherEnabled));
+        applyLauncherVisibility(settings.launcherEnabled);
         colorInput.value = settings.customColor;
         const customSwatch = themeGrid.querySelector('[data-mpp-theme-choice="custom"]');
         customSwatch?.style.setProperty('--mpp-swatch-accent', settings.customColor);
@@ -842,7 +1359,7 @@ function createAppearancePanel(panel, settingsButton) {
         }
     });
 
-    settingsPanel.append(header, themeCopy, themeGrid, colorRow, glassRange, fontRange, resetButton);
+    settingsPanel.append(header, themeCopy, themeGrid, colorRow, glassRange, fontRange, launcherRow, resetButton);
     refreshThemes();
     return settingsPanel;
 }
@@ -960,9 +1477,18 @@ function setupDesktopDimmer(panel) {
     dimmer.setAttribute('aria-hidden', 'true');
     if (panel.parentElement) panel.parentElement.insertBefore(dimmer, panel);
     else document.body.appendChild(dimmer);
-    const desktopQuery = window.matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)');
+    const desktopQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
     const update = () => {
-        dimmer.classList.toggle('is-visible', desktopQuery.matches && panel.classList.contains('openDrawer'));
+        const isOpen = panel.classList.contains('openDrawer');
+        dimmer.classList.toggle('is-visible', desktopQuery.matches && isOpen);
+        /* Programmatic toggle clicks (ESC cascade, dimmer, hero close) focus the native
+           drawer icon, so it keeps the theme's :focus glow after the panel closes. */
+        if (!isOpen) {
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && (active.closest('#persona-management-button') || panel.contains(active))) {
+                active.blur();
+            }
+        }
     };
     dimmer.addEventListener('click', () => {
         document.querySelector('#persona-management-button .drawer-toggle')?.click();
@@ -982,12 +1508,81 @@ function createSpotlight(panel, editorButton) {
     const copy = createElement('span', 'mpp-spotlight-copy');
     const kicker = createElement('small', '', t('selectedPersona'));
     const name = createElement('strong', '', t('loading'));
-    const hint = createElement('span', '', t('noSelection'));
-    copy.append(kicker, name, hint);
+    const chips = createElement('span', 'mpp-spotlight-chips');
+    chips.hidden = true;
+    const actions = createElement('span', 'mpp-spotlight-actions');
+    actions.hidden = true;
+    actions.setAttribute('aria-label', t('quickActions'));
+    const hint = createElement('span', 'mpp-spotlight-status', t('noSelection'));
+    copy.append(kicker, name, chips, actions, hint);
 
     const visualCropButton = createIconButton('fa-crop-simple', t('visualCropPortrait'), 'mpp-spotlight-visual-crop-button');
     const slidersButton = createIconButton('fa-sliders', t('fineTunePortrait'), 'mpp-spotlight-crop-button');
     slidersButton.setAttribute('aria-expanded', 'false');
+
+    let currentAvatarId = '';
+
+    const getPersonaStates = avatarId => {
+        if (!avatarId || power_user.personas?.[avatarId] === undefined) return [];
+        const connections = power_user.persona_descriptions?.[avatarId]?.connections;
+        const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
+        return [
+            avatarId === user_avatar ? ['active', 'fa-circle-check', t('active')] : null,
+            avatarId === power_user.default_persona ? ['default', 'fa-crown', t('default')] : null,
+            chatPersona === avatarId ? ['chat', 'fa-comments', t('chat')] : null,
+            Array.isArray(connections) && connections.length ? ['character', 'fa-user', t('character')] : null,
+            favoritePersonas.has(avatarId) ? ['favorite', 'fa-star', t('favoriteShort')] : null,
+        ].filter(Boolean);
+    };
+
+    const openCurrentPersonaEditor = async () => {
+        if (currentAvatarId && typeof panel.mppOpenPersonaEditor === 'function') {
+            await setUserAvatar(currentAvatarId, { toastPersonaNameChange: false });
+            await panel.mppOpenPersonaEditor(currentAvatarId, personaImageUrl(currentAvatarId));
+            return;
+        }
+        if (panel.classList.contains('mpp-editor-collapsed')) editorButton.click();
+        panel.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    const runSpotlightAction = async (button, handler) => {
+        if (!currentAvatarId || button.disabled) return;
+        button.disabled = true;
+        try {
+            await handler();
+            update();
+        } catch (error) {
+            console.error(`[${EXTENSION_NAME}] Spotlight action failed.`, error);
+            globalThis.toastr?.error?.(t('actionError'));
+        } finally {
+            button.disabled = false;
+        }
+    };
+
+    const editAction = createIconButton('fa-pen-to-square', t('editPersona'), 'mpp-spotlight-action');
+    const favoriteAction = createIconButton('fa-star', t('favorite'), 'mpp-spotlight-action mpp-spotlight-favorite');
+    const defaultAction = createIconButton('fa-crown', t('makeDefault'), 'mpp-spotlight-action mpp-spotlight-default');
+    const duplicateAction = createIconButton('fa-clone', t('duplicatePersona'), 'mpp-spotlight-action');
+    const exportAction = createIconButton('fa-file-export', t('exportPersona'), 'mpp-spotlight-action');
+    const statsAction = createIconButton('fa-chart-simple', t('personaStats'), 'mpp-spotlight-action');
+    actions.append(editAction, favoriteAction, defaultAction, duplicateAction, exportAction, statsAction);
+
+    editAction.addEventListener('click', () => runSpotlightAction(editAction, openCurrentPersonaEditor));
+    favoriteAction.addEventListener('click', () => runSpotlightAction(favoriteAction, async () => {
+        if (favoritePersonas.has(currentAvatarId)) favoritePersonas.delete(currentAvatarId);
+        else favoritePersonas.add(currentAvatarId);
+        saveFavorites();
+        await panel.mppRefresh?.();
+    }));
+    defaultAction.addEventListener('click', () => runSpotlightAction(defaultAction, async () => {
+        await setUserAvatar(currentAvatarId, { toastPersonaNameChange: false });
+        await togglePersonaLock('default');
+        await panel.mppRefresh?.();
+    }));
+    duplicateAction.addEventListener('click', () => runSpotlightAction(duplicateAction, () => duplicatePersonaThroughSillyTavern(panel, currentAvatarId)));
+    exportAction.addEventListener('click', () => runSpotlightAction(exportAction, () => exportPersonaJson(currentAvatarId)));
+    statsAction.addEventListener('click', () => runSpotlightAction(statsAction, () => showPersonaStatistics(currentAvatarId)));
+
     const cropPanel = createElement('section', 'mpp-crop-panel');
     cropPanel.hidden = true;
     const cropHeader = createElement('header', 'mpp-crop-header');
@@ -1054,18 +1649,9 @@ function createSpotlight(panel, editorButton) {
     const openEditor = createElement('button', 'mpp-button mpp-spotlight-edit');
     openEditor.type = 'button';
     openEditor.append(createElement('i', 'fa-solid fa-pen-to-square'), createElement('span', '', t('showEditor')));
-    openEditor.addEventListener('click', async () => {
-        if (currentAvatarId && typeof panel.mppOpenPersonaEditor === 'function') {
-            await setUserAvatar(currentAvatarId, { toastPersonaNameChange: false });
-            await panel.mppOpenPersonaEditor(currentAvatarId, personaImageUrl(currentAvatarId));
-            return;
-        }
-        if (panel.classList.contains('mpp-editor-collapsed')) editorButton.click();
-        panel.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
+    openEditor.addEventListener('click', () => runSpotlightAction(openEditor, openCurrentPersonaEditor));
     spotlight.append(portrait, copy, visualCropButton, slidersButton, openEditor, cropPanel);
 
-    let currentAvatarId = '';
     let currentCrop = getPortraitCrop('');
     let modalOriginalCrop = null;
     let modalGeometry = null;
@@ -1252,6 +1838,50 @@ function createSpotlight(panel, editorButton) {
     });
 
     image.addEventListener('load', () => applyCrop(currentCrop));
+    // First applyCrop runs while the panel is still display:none: the frame measures 0px and
+    // getFrameRatio() falls back to a guess, so the photo sits wrong until the next refresh.
+    new ResizeObserver(() => {
+        if (!image.naturalWidth || !portrait.clientWidth) return;
+        applyCrop(currentCrop);
+    }).observe(portrait);
+
+    const renderSpotlightActions = () => {
+        const hasPersona = Boolean(currentAvatarId);
+        [editAction, favoriteAction, defaultAction, duplicateAction, exportAction, statsAction].forEach(button => {
+            button.disabled = !hasPersona;
+        });
+        const isFavorite = hasPersona && favoritePersonas.has(currentAvatarId);
+        favoriteAction.classList.toggle('is-active', isFavorite);
+        favoriteAction.title = t(isFavorite ? 'unfavorite' : 'favorite');
+        favoriteAction.setAttribute('aria-label', favoriteAction.title);
+        favoriteAction.setAttribute('aria-pressed', String(isFavorite));
+        const isDefault = hasPersona && currentAvatarId === power_user.default_persona;
+        defaultAction.classList.toggle('is-active', isDefault);
+        defaultAction.setAttribute('aria-pressed', String(isDefault));
+    };
+
+    const renderSpotlightMeta = () => {
+        const hasPersona = Boolean(currentAvatarId);
+        const states = getPersonaStates(currentAvatarId);
+        const tags = hasPersona ? getPersonaTags(currentAvatarId) : [];
+        chips.replaceChildren(
+            ...states.map(([state, icon, label]) => {
+                const chip = createElement('span', `mpp-badge is-${state}`);
+                chip.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', label));
+                return chip;
+            }),
+            ...tags.map(tag => {
+                const chip = createElement('span', 'mpp-badge is-tag');
+                chip.append(createElement('i', 'fa-solid fa-tag'), createElement('span', '', tag));
+                return chip;
+            }),
+        );
+        chips.hidden = !hasPersona || (states.length === 0 && tags.length === 0);
+        actions.hidden = !hasPersona;
+        hint.hidden = hasPersona;
+        if (!hasPersona) hint.textContent = t('noSelection');
+        renderSpotlightActions();
+    };
 
     const update = () => {
         currentAvatarId = user_avatar && power_user.personas?.[user_avatar] !== undefined ? user_avatar : '';
@@ -1261,14 +1891,8 @@ function createSpotlight(panel, editorButton) {
         visualCropButton.hidden = !currentAvatarId;
         slidersButton.hidden = !currentAvatarId;
         applyCrop(getPortraitCrop(currentAvatarId));
-        name.textContent = currentAvatarId ? (power_user.personas[currentAvatarId] || t('noSelection')) : t('noSelection');
-        const connections = power_user.persona_descriptions?.[currentAvatarId]?.connections;
-        const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
-        hint.textContent = currentAvatarId === power_user.default_persona
-            ? t('default')
-            : chatPersona === currentAvatarId || (Array.isArray(connections) && connections.length > 0)
-                ? t('linked')
-                : t('active');
+        name.textContent = currentAvatarId ? (power_user.personas[currentAvatarId] || t('unnamedPersona')) : t('noSelection');
+        renderSpotlightMeta();
     };
 
     return { spotlight, update };
@@ -1287,9 +1911,20 @@ function createFilterBar(avatarBlock) {
     let activeFilter = 'all';
 
     const apply = () => {
-        const predicate = definitions.find(([id]) => id === activeFilter)?.[2] || (() => true);
+        const tagMatch = activeFilter.startsWith('tag:') ? activeFilter.slice(4) : null;
+        const predicate = tagMatch !== null
+            ? card => getPersonaTags(getCardAvatarId(card)).includes(tagMatch)
+            : definitions.find(([id]) => id === activeFilter)?.[2] || (() => true);
         avatarBlock.querySelectorAll(':scope > .avatar-container').forEach(card => {
             card.classList.toggle('mpp-filter-hidden', !predicate(card));
+        });
+    };
+
+    const syncActive = () => {
+        bar.querySelectorAll('.mpp-filter').forEach(item => {
+            const active = item.dataset.mppFilter === activeFilter;
+            item.classList.toggle('is-active', active);
+            item.setAttribute('aria-pressed', String(active));
         });
     };
 
@@ -1302,18 +1937,45 @@ function createFilterBar(avatarBlock) {
             event.preventDefault();
             event.stopPropagation();
             activeFilter = id;
-            bar.querySelectorAll('.mpp-filter').forEach(item => {
-                const active = item.dataset.mppFilter === activeFilter;
-                item.classList.toggle('is-active', active);
-                item.setAttribute('aria-pressed', String(active));
-            });
+            syncActive();
             apply();
         });
         button.setAttribute('aria-pressed', String(id === activeFilter));
         bar.appendChild(button);
     });
 
-    return { bar, apply };
+    const tagFilters = createElement('span', 'mpp-filter-tags');
+    bar.appendChild(tagFilters);
+
+    const renderTags = () => {
+        const tags = allUsedTags();
+        if (activeFilter.startsWith('tag:') && !tags.includes(activeFilter.slice(4))) activeFilter = 'all';
+        tagFilters.replaceChildren(...tags.map(tag => {
+            const chip = createElement('button', 'mpp-filter mpp-filter-tag');
+            chip.type = 'button';
+            chip.dataset.mppFilter = `tag:${tag}`;
+            chip.append(createElement('i', 'fa-solid fa-tag'), createElement('span', '', tag));
+            chip.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                activeFilter = activeFilter === `tag:${tag}` ? 'all' : `tag:${tag}`;
+                syncActive();
+                apply();
+            });
+            return chip;
+        }));
+        tagFilters.hidden = tags.length === 0;
+        syncActive();
+    };
+
+    const setTagFilter = tag => {
+        const available = allUsedTags();
+        activeFilter = tag && available.includes(tag) ? `tag:${tag}` : 'all';
+        syncActive();
+        apply();
+    };
+
+    return { bar, apply, renderTags, setTagFilter };
 }
 
 function createPersonaCardFromTemplate(avatarBlock, avatarId) {
@@ -1392,6 +2054,7 @@ function createSortController({ panel, avatarBlock, searchInput, sortSelect, pag
             render();
         });
         pager.append(label, first, previous, next, last, size);
+        paginationContainer.classList.add('mpp-has-custom-pager');
         paginationContainer.replaceChildren(pager);
     };
     const render = async () => {
@@ -1428,6 +2091,7 @@ function createSortController({ panel, avatarBlock, searchInput, sortSelect, pag
         localStorage.setItem(SORT_KEY, state.sort);
         if (isCustom()) await render();
         else {
+            paginationContainer.classList.remove('mpp-has-custom-pager');
             power_user.persona_sort_order = state.sort;
             globalThis.SillyTavern?.getContext?.()?.saveSettingsDebounced?.();
             await getUserAvatars(true, user_avatar);
@@ -1461,8 +2125,12 @@ function createDensityControls(avatarBlock) {
         avatarBlock.dataset.mppMobileColumns = String(state.mobileColumns);
         shelf.classList.toggle('is-active', state.density === 'shelf');
         compact.classList.toggle('is-active', state.density === 'compact');
+        shelf.setAttribute('aria-pressed', String(state.density === 'shelf'));
+        compact.setAttribute('aria-pressed', String(state.density === 'compact'));
         mobile.querySelectorAll('button').forEach(button => {
-            button.classList.toggle('is-active', Number(button.textContent) === state.mobileColumns);
+            const active = state.density === 'compact' && Number(button.textContent) === state.mobileColumns;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
         });
     };
 
@@ -1480,8 +2148,12 @@ function createDensityControls(avatarBlock) {
         const button = createElement('button', '', String(columns));
         button.type = 'button';
         button.title = `${t('mobileColumns')}: ${columns}`;
+        button.setAttribute('aria-label', button.title);
         button.addEventListener('click', () => {
             state.mobileColumns = columns;
+            /* Column counts only exist in the compact grid; switch so the tap visibly works. */
+            state.density = 'compact';
+            localStorage.setItem(DENSITY_KEY, state.density);
             localStorage.setItem(MOBILE_COLUMNS_KEY, String(columns));
             apply();
         });
@@ -1669,9 +2341,11 @@ async function exportAllPersonasZip() {
     globalThis.toastr?.success?.(t('backupReady'));
 }
 
-async function exportAllPersonasJson() {
-    const avatarIds = await getUserAvatars(false);
-    if (!Array.isArray(avatarIds) || !avatarIds.length) {
+async function exportAllPersonasJson(onlyIds = null) {
+    let avatarIds = await getUserAvatars(false);
+    if (!Array.isArray(avatarIds)) avatarIds = [];
+    if (Array.isArray(onlyIds)) avatarIds = avatarIds.filter(avatarId => onlyIds.includes(avatarId));
+    if (!avatarIds.length) {
         globalThis.toastr?.info?.(t('backupEmpty'));
         return;
     }
@@ -1686,7 +2360,7 @@ async function exportAllPersonasJson() {
         persona_descriptions: personaDescriptions,
         default_persona: power_user.default_persona ?? null,
     }, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, `personas-${backupTimestamp()}.json`);
+    downloadBlob(blob, `personas${Array.isArray(onlyIds) ? '-selected' : ''}-${backupTimestamp()}.json`);
     globalThis.toastr?.success?.(t('backupReady'));
 }
 
@@ -1799,7 +2473,9 @@ async function deletePersonaNow(avatarId, panel) {
         headers: ctx.getRequestHeaders(),
         body: JSON.stringify({ avatar: avatarId }),
     });
-    if (!response.ok) throw new Error(`Persona deletion failed (${response.status}).`);
+    // 404 means the avatar file is already gone (phantom settings entry): finish the local cleanup anyway.
+    if (response.status === 404) console.info(`[${EXTENSION_NAME}] Avatar file already missing, cleaning settings only: ${avatarId}`);
+    else if (!response.ok) throw new Error(`Persona deletion failed (${response.status}).`);
 
     delete power_user.personas?.[avatarId];
     delete power_user.persona_descriptions?.[avatarId];
@@ -1823,6 +2499,10 @@ async function deletePersonaNow(avatarId, panel) {
     const usage = loadPersonaUsage();
     delete usage[avatarId];
     localStorage.setItem(PERSONA_USAGE_KEY, JSON.stringify(usage));
+    if (personaTags[avatarId] !== undefined) {
+        delete personaTags[avatarId];
+        savePersonaTags();
+    }
     ctx.saveSettingsDebounced?.();
     await eventSource.emit(event_types.PERSONA_DELETED, { avatarId, name });
     await getUserAvatars(true);
@@ -1882,6 +2562,357 @@ async function schedulePersonaDeletion(panel, avatarId) {
     return true;
 }
 
+function isCleanupProtected(avatarId) {
+    const connections = power_user.persona_descriptions?.[avatarId]?.connections;
+    const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
+    return avatarId === user_avatar
+        || avatarId === power_user.default_persona
+        || avatarId === chatPersona
+        || favoritePersonas.has(avatarId)
+        || (Array.isArray(connections) && connections.length > 0);
+}
+
+function createCleanupWorkspace(panel) {
+    const workspace = createElement('section', 'mpp-cleanup');
+    workspace.hidden = true;
+
+    const top = createElement('header', 'mpp-cleanup-top');
+    const backButton = createElement('button', 'mpp-button mpp-cleanup-back');
+    backButton.type = 'button';
+    backButton.append(createElement('i', 'fa-solid fa-arrow-left'), createElement('span', '', t('backToLibrary')));
+    const title = createElement('span', 'mpp-cleanup-title');
+    title.append(createElement('strong', '', t('cleanupTitle')), createElement('small', '', t('cleanupHint')));
+    const topActions = createElement('span', 'mpp-cleanup-top-actions');
+    const daysSelect = createElement('select', 'mpp-cleanup-days');
+    daysSelect.setAttribute('aria-label', t('cleanupDaysLabel'));
+    [30, 60, 90].forEach(days => {
+        const option = createElement('option', '', t('cleanupDays').replace('{days}', String(days)));
+        option.value = String(days);
+        daysSelect.appendChild(option);
+    });
+    daysSelect.value = '60';
+    const backupButton = createElement('button', 'mpp-button mpp-cleanup-backup');
+    backupButton.type = 'button';
+    backupButton.title = t('cleanupBackup');
+    backupButton.append(createElement('i', 'fa-solid fa-file-zipper'), createElement('span', '', t('cleanupBackup')));
+    backupButton.addEventListener('click', () => exportAllPersonasZip());
+    topActions.append(daysSelect, backupButton);
+    top.append(backButton, title, topActions);
+
+    const body = createElement('div', 'mpp-cleanup-body');
+
+    const bar = createElement('footer', 'mpp-cleanup-bar');
+    const selectedLabel = createElement('span', 'mpp-cleanup-selected');
+    const exportButton = createElement('button', 'mpp-button mpp-cleanup-export');
+    exportButton.type = 'button';
+    exportButton.append(createElement('i', 'fa-solid fa-file-export'), createElement('span', '', t('cleanupExportSelected')));
+    const deleteButton = createElement('button', 'mpp-button mpp-cleanup-delete');
+    deleteButton.type = 'button';
+    deleteButton.append(createElement('i', 'fa-solid fa-trash'), createElement('span', '', t('cleanupDeleteSelected')));
+    bar.append(selectedLabel, exportButton, deleteButton);
+
+    workspace.append(top, body, bar);
+
+    const selected = new Set();
+    let dustDays = 60;
+
+    const renderBar = () => {
+        const count = selected.size;
+        selectedLabel.textContent = count ? t('cleanupSelected').replace('{count}', String(count)) : '';
+        exportButton.disabled = !count;
+        deleteButton.disabled = !count;
+        deleteButton.querySelector('span').textContent = count
+            ? `${t('cleanupDeleteSelected')} (${count})`
+            : t('cleanupDeleteSelected');
+    };
+
+    const collectCandidates = async () => {
+        // Bind to avatar files that actually exist on disk: settings entries without files are phantoms
+        // left by external cleanups. If the file list cannot be fetched at all, fall back to settings keys.
+        const fileIds = await getUserAvatars(false).catch(() => null);
+        const keys = Object.keys(power_user.personas || {}).filter(Boolean);
+        const avatarIds = Array.isArray(fileIds) ? keys.filter(id => fileIds.includes(id)) : keys;
+        const usage = loadPersonaUsage();
+        const firstSeen = loadFirstSeen();
+        const modified = loadPersonaModified();
+        const infoOf = id => {
+            const connections = power_user.persona_descriptions?.[id]?.connections;
+            return {
+                id,
+                name: power_user.personas?.[id] || id,
+                last: Number(usage[id]?.lastUsed || 0) || personaTimestamp(id, firstSeen),
+                created: personaTimestamp(id, firstSeen),
+                modified: Number(modified[id] || 0),
+                description: String(power_user.persona_descriptions?.[id]?.description || ''),
+                hasDescription: Boolean(String(power_user.persona_descriptions?.[id]?.description || '').trim()),
+                links: Array.isArray(connections) ? connections.length : 0,
+                protected: isCleanupProtected(id),
+            };
+        };
+        const byName = new Map();
+        avatarIds.forEach(id => {
+            const key = String(power_user.personas?.[id] || '').trim().toLocaleLowerCase();
+            if (!key) return;
+            if (!byName.has(key)) byName.set(key, []);
+            byName.get(key).push(id);
+        });
+        const duplicateGroups = [...byName.values()]
+            .filter(ids => ids.length > 1)
+            .map(ids => ({
+                name: power_user.personas?.[ids[0]] || '',
+                infos: ids.map(infoOf).sort((left, right) => right.last - left.last),
+            }))
+            .sort((left, right) => right.infos.length - left.infos.length);
+        const emptyInfos = avatarIds
+            .map(infoOf)
+            .filter(info => !info.hasDescription && !info.protected)
+            .sort((left, right) => left.last - right.last);
+        const cutoff = Date.now() - dustDays * 24 * 60 * 60 * 1000;
+        const dustyInfos = avatarIds
+            .map(infoOf)
+            .filter(info => !info.protected && info.last && info.last < cutoff)
+            .sort((left, right) => left.last - right.last);
+        return { duplicateGroups, emptyInfos, dustyInfos };
+    };
+
+    // Set when the editor was opened from the details popup: closing the editor resumes the cleanup.
+    let resumeAfterEditor = false;
+    let inspectedAvatarId = '';
+    let restoreAvatarId = '';
+
+    const showDetails = async info => {
+        const content = createElement('div', 'mpp-cleanup-details-view');
+        const head = createElement('header', 'mpp-cleanup-details-head');
+        const portrait = createElement('img');
+        portrait.src = personaThumbnailUrl(info.id);
+        portrait.alt = info.name;
+        portrait.draggable = false;
+        const headCopy = createElement('span', 'mpp-cleanup-details-title');
+        headCopy.append(createElement('strong', '', info.name), createElement('small', '', info.id));
+        head.append(portrait, headCopy);
+        const badges = createElement('span', 'mpp-cleanup-details-badges');
+        const chatPersona = globalThis.SillyTavern?.getContext?.()?.chatMetadata?.persona;
+        [
+            [info.id === user_avatar, 'active', 'fa-circle-check'],
+            [info.id === power_user.default_persona, 'default', 'fa-crown'],
+            [favoritePersonas.has(info.id), 'favorite', 'fa-star'],
+            [info.id === chatPersona, 'chat', 'fa-comments'],
+            [info.links > 0, 'character', 'fa-user'],
+            [info.protected, 'protected', 'fa-shield-halved'],
+        ].forEach(([visible, state, icon]) => {
+            if (!visible) return;
+            const labelKeys = { favorite: 'favoriteShort', protected: 'cleanupProtected' };
+            const badge = createElement('span', `mpp-badge is-${state}`);
+            badge.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', t(labelKeys[state] || state)));
+            badges.appendChild(badge);
+        });
+        badges.hidden = !badges.childElementCount;
+        const description = createElement('p', 'mpp-cleanup-details-desc', info.description.trim() || t('noDescription'));
+        const tagsRow = createElement('span', 'mpp-cleanup-details-tags');
+        getPersonaTags(info.id).forEach(tag => {
+            const chip = createElement('span', 'mpp-cleanup-details-tag');
+            chip.append(createElement('i', 'fa-solid fa-tag'), createElement('span', '', tag));
+            tagsRow.appendChild(chip);
+        });
+        tagsRow.hidden = !tagsRow.childElementCount;
+        const meta = createElement('dl', 'mpp-cleanup-details-meta');
+        [
+            [t('statsCreated'), formatStatDate(info.created)],
+            [t('statsModified'), formatStatDate(info.modified)],
+            [t('statsLastUsed'), formatStatDate(info.last)],
+            [t('cleanupLinked'), String(info.links)],
+        ].forEach(([label, value]) => {
+            meta.append(createElement('dt', '', label), createElement('dd', '', value));
+        });
+        const hint = createElement('small', 'mpp-cleanup-details-hint', t('cleanupEditActivates'));
+        content.append(head, badges, description, tagsRow, meta, hint);
+        const result = await new Popup(content, POPUP_TYPE.TEXT, '', {
+            wide: true,
+            customButtons: [{ text: t('cleanupOpenInEditor'), result: POPUP_RESULT.CUSTOM1, icon: 'fa-pen', appendAtEnd: true }],
+        }).show();
+        if (result === POPUP_RESULT.CUSTOM1 && power_user.personas?.[info.id] !== undefined && typeof panel.mppOpenPersonaEditor === 'function') {
+            resumeAfterEditor = true;
+            inspectedAvatarId = info.id;
+            restoreAvatarId = user_avatar !== info.id ? user_avatar : '';
+            // The editor silently activates the persona on open: skip that "usage" so inspection
+            // does not push the persona out of the dusty/empty cleanup groups.
+            if (restoreAvatarId) skipNextUsageRecord = true;
+            try {
+                await panel.mppOpenPersonaEditor(info.id, personaImageUrl(info.id));
+            } finally {
+                // The editor did not open (early return or failure): nothing to resume after.
+                if (!panel.classList.contains('mpp-creating')) {
+                    resumeAfterEditor = false;
+                    inspectedAvatarId = '';
+                    restoreAvatarId = '';
+                    skipNextUsageRecord = false;
+                }
+            }
+        }
+    };
+
+    const createRow = info => {
+        const row = createElement('label', 'mpp-cleanup-row');
+        row.dataset.avatarId = info.id;
+        if (info.protected) row.classList.add('is-protected');
+        const checkbox = createElement('input', 'mpp-cleanup-check');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selected.has(info.id);
+        checkbox.disabled = info.protected;
+        checkbox.setAttribute('aria-label', info.name);
+        const image = createElement('img');
+        image.src = personaThumbnailUrl(info.id);
+        image.alt = '';
+        image.loading = 'lazy';
+        image.draggable = false;
+        const copy = createElement('span', 'mpp-cleanup-row-copy');
+        const meta = [
+            `${t('cleanupLastUsed')}: ${info.last ? formatStatDate(info.last) : '—'}`,
+            info.hasDescription ? '' : t('cleanupNoDesc'),
+            info.links ? `${t('cleanupLinked')}: ${info.links}` : '',
+        ].filter(Boolean).join(' • ');
+        copy.append(createElement('strong', '', info.name), createElement('small', '', meta));
+        const detailsButton = createIconButton('fa-eye', `${t('cleanupDetails')}: ${info.name}`, 'mpp-cleanup-details');
+        detailsButton.addEventListener('click', event => {
+            // The row is a <label>: keep the click from toggling the checkbox.
+            event.preventDefault();
+            event.stopPropagation();
+            showDetails(info).catch(error => console.error(`[${EXTENSION_NAME}] Could not show persona details.`, error));
+        });
+        row.append(checkbox, image, copy);
+        if (info.protected) row.appendChild(createElement('span', 'mpp-cleanup-protected', t('cleanupProtected')));
+        row.appendChild(detailsButton);
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) selected.add(info.id);
+            else selected.delete(info.id);
+            body.querySelectorAll(`.mpp-cleanup-row[data-avatar-id="${CSS.escape(info.id)}"] .mpp-cleanup-check`)
+                .forEach(twin => { twin.checked = checkbox.checked; });
+            renderBar();
+        });
+        return row;
+    };
+
+    const createGroup = (title, infos, hint, { keepNewest = false } = {}) => {
+        const group = createElement('section', 'mpp-cleanup-group');
+        const head = createElement('header', 'mpp-cleanup-group-head');
+        const headCopy = createElement('span', 'mpp-cleanup-group-title');
+        headCopy.append(createElement('strong', '', title), createElement('small', '', ` ×${infos.length}`));
+        head.appendChild(headCopy);
+        const selectable = infos.filter(info => !info.protected);
+        if (keepNewest && infos.length > 1 && selectable.length) {
+            // Duplicates are sorted freshest first: keeping the newest means selecting every older copy.
+            const keepButton = createElement('button', 'mpp-button mpp-cleanup-select-group', t('cleanupKeepNewest'));
+            keepButton.type = 'button';
+            keepButton.addEventListener('click', () => {
+                infos.forEach(info => selected.delete(info.id));
+                infos.slice(1).forEach(info => { if (!info.protected) selected.add(info.id); });
+                renderSafe();
+            });
+            head.appendChild(keepButton);
+        } else if (selectable.length > 1) {
+            const selectGroup = createElement('button', 'mpp-button mpp-cleanup-select-group', t('cleanupSelectGroup'));
+            selectGroup.type = 'button';
+            selectGroup.addEventListener('click', () => {
+                const allSelected = selectable.every(info => selected.has(info.id));
+                selectable.forEach(info => allSelected ? selected.delete(info.id) : selected.add(info.id));
+                renderSafe();
+            });
+            head.appendChild(selectGroup);
+        }
+        group.appendChild(head);
+        if (hint) group.appendChild(createElement('small', 'mpp-cleanup-group-hint', hint));
+        const rows = createElement('div', 'mpp-cleanup-rows');
+        rows.append(...infos.map(createRow));
+        group.appendChild(rows);
+        return group;
+    };
+
+    const render = async () => {
+        [...selected].forEach(id => {
+            if (power_user.personas?.[id] === undefined) selected.delete(id);
+        });
+        const { duplicateGroups, emptyInfos, dustyInfos } = await collectCandidates();
+        const groups = [];
+        duplicateGroups.forEach(group => groups.push(createGroup(`«${group.name}»`, group.infos, t('cleanupDuplicatesHint'), { keepNewest: true })));
+        if (emptyInfos.length) groups.push(createGroup(t('cleanupEmpty'), emptyInfos, t('cleanupEmptyHint')));
+        if (dustyInfos.length) groups.push(createGroup(t('cleanupDusty'), dustyInfos, t('cleanupDustyHint')));
+        body.replaceChildren(...(groups.length ? groups : [createElement('div', 'mpp-cleanup-empty', t('cleanupClean'))]));
+        renderBar();
+    };
+
+    const renderSafe = () => render().catch(error => console.error(`[${EXTENSION_NAME}] Could not render cleanup workspace.`, error));
+
+    exportButton.addEventListener('click', async () => {
+        const ids = [...selected];
+        if (!ids.length) return;
+        exportButton.disabled = true;
+        try { await exportAllPersonasJson(ids); }
+        finally { exportButton.disabled = !selected.size; }
+    });
+
+    deleteButton.addEventListener('click', async () => {
+        const ids = [...selected].filter(id => !isCleanupProtected(id));
+        if (!ids.length) return;
+        const names = ids.map(id => power_user.personas?.[id] || id).join('<br>');
+        const confirmed = await Popup.show.confirm(t('cleanupDeleteConfirm'), `${names}<br><br>${t('cleanupDeleteHint')}`);
+        if (!confirmed) return;
+        deleteButton.disabled = true;
+        let deleted = 0;
+        for (const id of ids) {
+            try {
+                if (await deletePersonaNow(id, panel)) {
+                    selected.delete(id);
+                    deleted += 1;
+                }
+            } catch (error) {
+                console.error(`[${EXTENSION_NAME}] Could not delete persona: ${id}`, error);
+            }
+        }
+        if (deleted) globalThis.toastr?.success?.(t('cleanupDeleted').replace('{count}', String(deleted)));
+        if (deleted < ids.length) globalThis.toastr?.error?.(t('actionError'));
+        await renderSafe();
+    });
+
+    const open = ({ preserveSelection = false } = {}) => {
+        if (panel.classList.contains('mpp-creating')) panel.mppClosePersonaEditor?.();
+        if (!preserveSelection) selected.clear();
+        renderSafe();
+        panel.classList.add('mpp-cleaning');
+        workspace.hidden = false;
+    };
+    const close = () => {
+        workspace.hidden = true;
+        panel.classList.remove('mpp-cleaning');
+    };
+    backButton.addEventListener('click', close);
+    daysSelect.addEventListener('change', () => {
+        dustDays = Number(daysSelect.value) || 60;
+        renderSafe();
+    });
+    panel.mppCloseCleanup = close;
+    panel.mppPersonaEditorClosed = async ({ deliberateActivation = false } = {}) => {
+        if (!resumeAfterEditor) return;
+        resumeAfterEditor = false;
+        const inspectedId = inspectedAvatarId;
+        const restoreId = restoreAvatarId;
+        inspectedAvatarId = '';
+        restoreAvatarId = '';
+        // Undo the editor's silent activation, unless the user deliberately activated the persona
+        // themselves or switched elsewhere (e.g. via the launcher) while inspecting.
+        if (restoreId && inspectedId && !deliberateActivation && user_avatar === inspectedId) {
+            skipNextUsageRecord = true;
+            try {
+                await setUserAvatar(restoreId, { toastPersonaNameChange: false });
+            } catch (error) {
+                skipNextUsageRecord = false;
+                console.warn(`[${EXTENSION_NAME}] Could not restore the previous persona after inspection.`, error);
+            }
+        }
+        open({ preserveSelection: true });
+    };
+    return { workspace, open };
+}
+
 function createCardAction(icon, label, className, handler) {
     const button = createElement('button', `mpp-card-action ${className}`);
     button.type = 'button';
@@ -1930,6 +2961,7 @@ function ensureCardActions(card) {
             if (panel?.classList.contains('mpp-editor-collapsed')) panel.querySelector('.mpp-editor-button')?.click();
             panel?.querySelector('.mpp-editor-column')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
+        edit.appendChild(createElement('span', 'mpp-card-edit-label', t('editShort')));
         const duplicate = createCardAction('fa-clone', t('duplicatePersona'), 'mpp-action-duplicate', async () => {
             await duplicatePersonaThroughSillyTavern(card.closest(PANEL_SELECTOR), avatarId);
         });
@@ -1980,10 +3012,42 @@ function updateCardBadges(card) {
 
     activeStates.forEach(([, labelKey, iconClass]) => {
         const badge = createElement('span', `mpp-badge is-${labelKey}`);
+        badge.setAttribute('aria-label', t(labelKey));
         badge.append(createElement('i', `fa-solid ${iconClass}`), createElement('span', '', t(labelKey)));
         badges.appendChild(badge);
     });
     badges.hidden = badges.childElementCount === 0;
+}
+
+function updateCardTags(card) {
+    const avatarId = getCardAvatarId(card);
+    const host = card.querySelector(':scope .character_select_container');
+    const tags = avatarId ? getPersonaTags(avatarId) : [];
+    const existing = card.querySelector(':scope .mpp-card-tags');
+    if (!host || !tags.length) {
+        existing?.remove();
+        return;
+    }
+    const tagsRow = existing || host.appendChild(createElement('span', 'mpp-card-tags'));
+    const signature = tags.join('\u0001');
+    if (tagsRow.dataset.mppTags === signature) return;
+    tagsRow.dataset.mppTags = signature;
+    const chips = tags.slice(0, 3).map(tag => {
+        const chip = createElement('button', 'mpp-card-tag');
+        chip.type = 'button';
+        chip.dataset.tag = tag;
+        const label = t('tagCardFilter').replace('{tag}', tag);
+        chip.title = label;
+        chip.setAttribute('aria-label', label);
+        chip.append(createElement('i', 'fa-solid fa-tag'), createElement('span', '', tag));
+        return chip;
+    });
+    if (tags.length > 3) {
+        const more = createElement('span', 'mpp-card-tag-more', `+${tags.length - 3}`);
+        more.title = tags.slice(3).join(', ');
+        chips.push(more);
+    }
+    tagsRow.replaceChildren(...chips);
 }
 
 function decorateCards(avatarBlock) {
@@ -2006,6 +3070,7 @@ function decorateCards(avatarBlock) {
         }
         ensureCardActions(card);
         updateCardBadges(card);
+        updateCardTags(card);
     });
 }
 
@@ -2031,6 +3096,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     const top = createElement('header', 'mpp-creator-top');
     const backButton = createElement('button', 'mpp-button mpp-creator-back');
     backButton.type = 'button';
+    backButton.setAttribute('aria-label', t('creatorBack'));
+    backButton.title = t('creatorBack');
     backButton.append(createElement('i', 'fa-solid fa-arrow-left'), createElement('span', '', t('creatorBack')));
     const saveButton = createElement('button', 'mpp-button mpp-creator-save');
     saveButton.type = 'button';
@@ -2066,6 +3133,9 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         const button = createElement('button', 'mpp-creator-tool');
         button.type = 'button';
         button.dataset.creatorTool = key;
+        /* Narrow panels hide the text label; keep the name on hover and for screen readers. */
+        button.title = label;
+        button.setAttribute('aria-label', label);
         button.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', label));
         toolButtons.set(key, button);
         toolNav.appendChild(button);
@@ -2081,7 +3151,9 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     nameInput.maxLength = 120;
     nameInput.placeholder = t('creatorName');
     nameInput.hidden = true;
-    identityCopy.append(nameDisplay, nameInput);
+    const identityMeta = createElement('span', 'mpp-creator-meta');
+    identityMeta.hidden = true;
+    identityCopy.append(nameDisplay, nameInput, identityMeta);
     const identityActions = createElement('span', 'mpp-creator-actions');
     const renameButton = createIconButton('fa-pencil', t('creatorRename'), 'mpp-creator-rename');
     const activateButton = createIconButton('fa-circle-check', t('activatePersona'), 'mpp-creator-action mpp-creator-activate');
@@ -2096,15 +3168,20 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
 
     const descriptionField = createElement('section', 'mpp-creator-field mpp-creator-description');
     const descriptionHead = createElement('header', 'mpp-creator-field-head');
-    descriptionHead.appendChild(createElement('strong', '', t('creatorDescription')));
+    const descriptionTitle = createElement('strong', '', t('creatorDescription'));
+    descriptionTitle.prepend(createElement('i', 'fa-solid fa-align-left'));
+    const descriptionCounter = createElement('small', 'mpp-creator-counter', '0');
     const expandDescription = createIconButton('fa-expand', t('creatorExpandDescription'), 'mpp-creator-description-expand');
-    descriptionHead.appendChild(expandDescription);
+    descriptionHead.append(descriptionTitle, descriptionCounter, expandDescription);
     const description = createElement('textarea', 'text_pole mpp-creator-description-input');
     description.rows = 12;
     descriptionField.append(descriptionHead, description);
 
     const toolStage = createElement('section', 'mpp-creator-tool-stage');
     toolStage.hidden = true;
+    const toolStageHead = createElement('header', 'mpp-creator-tool-stage-head');
+    const toolStageTitle = createElement('strong', '', t('creatorPosition'));
+    toolStageHead.appendChild(toolStageTitle);
 
     const positionPanel = createElement('div', 'mpp-creator-tool-panel');
     positionPanel.dataset.creatorPanel = 'position';
@@ -2173,7 +3250,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     openLorebookButton.type = 'button';
     openLorebookButton.append(createElement('i', 'fa-solid fa-arrow-up-right-from-square'), createElement('span', '', t('openLorebook')));
     lorebookPanel.append(lorebook, lorebookChoices, openLorebookButton);
-    toolStage.append(positionPanel, connectionsPanel, lorebookPanel);
+    toolStage.append(toolStageHead, positionPanel, connectionsPanel, lorebookPanel);
     left.appendChild(toolStage);
 
     const connectionPreview = createElement('section', 'mpp-creator-linked');
@@ -2186,11 +3263,24 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
 
     const notesField = createElement('label', 'mpp-creator-field mpp-creator-notes');
     const notesTitle = createElement('strong', '', t('creatorNotes'));
+    notesTitle.prepend(createElement('i', 'fa-solid fa-lock'));
     const notesHint = createElement('small', '', t('creatorNotesHint'));
     const notes = createElement('textarea', 'text_pole');
     notes.rows = 5;
     notesField.append(notesTitle, notesHint, notes);
-    right.append(identity, descriptionField, notesField);
+
+    const tagsField = createElement('section', 'mpp-creator-field mpp-creator-tags');
+    const tagsTitle = createElement('strong', '', t('tags'));
+    tagsTitle.prepend(createElement('i', 'fa-solid fa-tags'));
+    const tagsHint = createElement('small', '', t('tagsHint'));
+    const tagsEditor = createElement('div', 'mpp-tags-editor');
+    const tagsInput = createElement('input', 'mpp-tags-input');
+    tagsInput.type = 'text';
+    tagsInput.placeholder = t('tagAdd');
+    tagsInput.setAttribute('aria-label', t('tagAdd'));
+    tagsEditor.appendChild(tagsInput);
+    tagsField.append(tagsTitle, tagsHint, tagsEditor);
+    right.append(identity, descriptionField, tagsField, notesField);
     body.append(left, right);
     workspace.append(top, body);
 
@@ -2203,8 +3293,50 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         cropData: null,
         previousWindowMode: 'standard',
         locks: new Set(),
+        // True when the user explicitly pressed "activate" (as opposed to the silent activation on open).
+        deliberateActivation: false,
     };
     let descriptionTimer;
+    const updateDescriptionCounter = () => {
+        descriptionCounter.textContent = String(description.value.length);
+    };
+
+    const createTagChip = tag => {
+        const chip = createElement('span', 'mpp-tag-chip');
+        chip.append(createElement('i', 'fa-solid fa-tag'), createElement('span', '', tag));
+        const remove = createElement('button', 'mpp-tag-remove', '×');
+        remove.type = 'button';
+        remove.title = t('tagRemove');
+        remove.setAttribute('aria-label', `${t('tagRemove')}: ${tag}`);
+        remove.addEventListener('click', () => {
+            setPersonaTags(state.avatarId, getPersonaTags(state.avatarId).filter(item => item !== tag));
+            renderTagsEditor();
+            panel.mppRefresh?.();
+        });
+        chip.appendChild(remove);
+        return chip;
+    };
+    const renderTagsEditor = () => {
+        tagsEditor.querySelectorAll('.mpp-tag-chip').forEach(chip => chip.remove());
+        const tags = state.avatarId ? getPersonaTags(state.avatarId) : [];
+        tagsEditor.prepend(...tags.map(createTagChip));
+        tagsInput.value = '';
+        tagsInput.disabled = !state.avatarId;
+    };
+    const commitTagsInput = () => {
+        const value = tagsInput.value.trim();
+        tagsInput.value = '';
+        if (!value || !state.avatarId) return;
+        setPersonaTags(state.avatarId, [...getPersonaTags(state.avatarId), ...value.split(',')]);
+        renderTagsEditor();
+        panel.mppRefresh?.();
+    };
+    tagsInput.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ',') return;
+        event.preventDefault();
+        commitTagsInput();
+    });
+    tagsInput.addEventListener('blur', commitTagsInput);
 
     const context = () => globalThis.SillyTavern?.getContext?.();
     const notify = (message, type = 'error') => {
@@ -2240,6 +3372,22 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
             button.setAttribute('aria-pressed', String(active));
         });
     };
+    const renderEditorMeta = () => {
+        const hasPersona = Boolean(state.avatarId && power_user.personas?.[state.avatarId] !== undefined);
+        const states = hasPersona ? [
+            state.avatarId === user_avatar ? ['active', 'fa-circle-check', t('active')] : null,
+            state.avatarId === power_user.default_persona ? ['default', 'fa-crown', t('default')] : null,
+            favoritePersonas.has(state.avatarId) ? ['favorite', 'fa-star', t('favoriteShort')] : null,
+            state.locks.has('character') ? ['character', 'fa-user', t('character')] : null,
+            state.locks.has('chat') ? ['chat', 'fa-comments', t('chat')] : null,
+        ].filter(Boolean) : [];
+        identityMeta.replaceChildren(...states.map(([stateName, icon, label]) => {
+            const chip = createElement('span', `mpp-badge is-${stateName}`);
+            chip.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', label));
+            return chip;
+        }));
+        identityMeta.hidden = states.length === 0;
+    };
     const renderEditorActions = () => {
         const hasPersona = Boolean(state.avatarId && power_user.personas?.[state.avatarId] !== undefined);
         [activateButton, defaultButton, favoriteButton, recropButton, duplicateButton, exportButton, deleteButton]
@@ -2248,6 +3396,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         defaultButton.classList.toggle('is-active', hasPersona && state.avatarId === power_user.default_persona);
         favoriteButton.classList.toggle('is-active', hasPersona && favoritePersonas.has(state.avatarId));
         favoriteButton.title = t(hasPersona && favoritePersonas.has(state.avatarId) ? 'unfavorite' : 'favorite');
+        renderEditorMeta();
     };
     const renderHeroContext = () => {
         const editing = !workspace.hidden && Boolean(state.avatarId);
@@ -2345,6 +3494,8 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     };
     const renderActiveTool = () => {
         workspace.dataset.creatorTool = state.activeTool;
+        const activeToolButton = state.activeTool ? toolButtons.get(state.activeTool) : null;
+        toolStageTitle.textContent = activeToolButton?.querySelector('span')?.textContent || t('creatorPosition');
         toolStage.hidden = !state.activeTool;
         toolButtons.forEach((button, key) => {
             const active = key === state.activeTool;
@@ -2471,6 +3622,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         state.busy = false;
         state.file = null;
         state.cropData = null;
+        state.deliberateActivation = false;
         state.locks.clear();
         if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
         state.objectUrl = '';
@@ -2485,11 +3637,13 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         renameButton.classList.remove('is-active');
         renameButton.setAttribute('aria-pressed', 'false');
         description.value = '';
+        updateDescriptionCounter();
         position.value = '0';
         depth.value = '2';
         role.value = '0';
         notes.value = '';
         lorebook.value = '';
+        renderTagsEditor();
         fillLorebooks();
         connectionButtons.forEach(button => {
             button.classList.remove('is-active');
@@ -2507,6 +3661,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         renderConnectionPreview();
     };
     const showWorkspace = () => {
+        panel.mppCloseCleanup?.();
         state.previousWindowMode = panel.dataset.mppWindowMode || 'standard';
         panel.dataset.mppWindowMode = 'tall';
         panel.classList.add('mpp-creating');
@@ -2528,12 +3683,14 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         nameDisplay.textContent = existingName || t('creatorName');
         const value = power_user.persona_descriptions?.[avatarId] || {};
         description.value = value.description || '';
+        updateDescriptionCounter();
         position.value = String(value.position ?? 0);
         depth.value = String(value.depth ?? 2);
         role.value = String(value.role ?? 0);
         lorebook.value = String(value.lorebook || '');
         fillLorebooks();
         notes.value = readNotes(avatarId);
+        renderTagsEditor();
         syncConnectionButtons();
         const portraitSource = imageSource || personaImageUrl(avatarId);
         if (portraitSource) {
@@ -2549,11 +3706,15 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     };
     const close = () => {
         if (state.busy) return;
+        // Capture before reset() wipes them: listeners may need to know what was edited and how.
+        const closedAvatarId = state.avatarId;
+        const deliberateActivation = state.deliberateActivation;
         workspace.hidden = true;
         panel.classList.remove('mpp-creating');
         panel.dataset.mppWindowMode = state.previousWindowMode;
         reset();
         renderHeroContext();
+        panel.mppPersonaEditorClosed?.({ avatarId: closedAvatarId, deliberateActivation });
     };
 
     createButton.addEventListener('click', event => {
@@ -2562,6 +3723,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
         open();
     }, { capture: true });
     panel.mppOpenPersonaEditor = openExisting;
+    panel.mppClosePersonaEditor = close;
     panel.mppPersonaEditorAvatarId = () => state.avatarId;
     panel.mppRefreshPersonaEditor = () => {
         if (workspace.hidden || !state.avatarId || power_user.personas?.[state.avatarId] === undefined) return;
@@ -2593,6 +3755,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     });
     activateButton.addEventListener('click', () => runEditorAction(activateButton, async () => {
         if (!state.avatarId) return;
+        state.deliberateActivation = true;
         await setUserAvatar(state.avatarId);
         syncConnectionButtons();
         await panel.mppRefresh?.();
@@ -2673,6 +3836,7 @@ function createPersonaWorkspace(panel, createButton, personaCounter, updateSpotl
     depth.addEventListener('input', updateDescriptor);
     role.addEventListener('change', updateDescriptor);
     description.addEventListener('input', () => {
+        updateDescriptionCounter();
         window.clearTimeout(descriptionTimer);
         descriptionTimer = window.setTimeout(updateDescriptor, 250);
     });
@@ -2804,13 +3968,23 @@ function enhancePanel(panel) {
     const libraryCopy = createElement('span', 'mpp-library-copy');
     const libraryTitle = createElement('h3', '', t('library'));
     const personaCounter = createElement('span', 'mpp-persona-counter', t('loading'));
-    const desktopLibraryLayout = window.matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
     libraryTitle.append(document.createTextNode(': '), personaCounter);
     libraryCopy.appendChild(libraryTitle);
     const densityControls = createDensityControls(avatarBlock);
-    libraryHeader.append(libraryCopy, densityControls);
+    const cleanupOpenButton = createIconButton('fa-broom', t('cleanupTitle'), 'mpp-cleanup-open');
+    const libraryActions = createElement('span', 'mpp-library-actions');
+    libraryActions.append(cleanupOpenButton, densityControls);
+    libraryHeader.append(libraryCopy, libraryActions);
     leftColumn.prepend(libraryHeader);
-    const { bar: filters, apply: applyFilter } = createFilterBar(avatarBlock);
+    const { bar: filters, apply: applyFilter, renderTags: renderTagFilters, setTagFilter } = createFilterBar(avatarBlock);
+    // Tag chips on cards double as filter shortcuts. Capture phase beats the card's own activation click.
+    avatarBlock.addEventListener('click', event => {
+        const chip = event.target instanceof Element ? event.target.closest('.mpp-card-tag') : null;
+        if (!chip || !avatarBlock.contains(chip)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setTagFilter(chip.dataset.tag || '');
+    }, true);
     const createButton = nativeToolbar?.querySelector(':scope > .menu_button:not(#persona_grid_toggle), :scope > button:not(#persona_grid_toggle)');
     const searchInput = nativeToolbar?.querySelector('input[type="search"], input[type="text"]');
     const sortSelect = nativeToolbar?.querySelector('#persona_sort_order');
@@ -2837,12 +4011,27 @@ function enhancePanel(panel) {
     }
     createButton?.classList.add('mpp-create-persona');
     if (searchInput) searchInput.placeholder = t('searchByPersonaName');
-    if (desktopLibraryLayout && nativeToolbar) {
-        if (createButton) {
-            filters.appendChild(createButton);
-        }
-    }
     nativeToolbar?.after(filters);
+    // Keep the native controls and listeners when the panel crosses the phone breakpoint.
+    // Pagination follows the cards in the phone's single scrolling library.
+    const desktopLibraryQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
+    const shortTouchQuery = window.matchMedia('(max-height: 540px) and (pointer: coarse)');
+    const syncLibraryLayout = () => {
+        const width = panel.getBoundingClientRect().width;
+        if (!width || !nativeToolbar) return;
+        const narrow = width <= 562 || shortTouchQuery.matches; // Content box excludes borders.
+        const createParent = !narrow && desktopLibraryQuery.matches ? filters : nativeToolbar;
+        if (createButton && createButton.parentElement !== createParent) {
+            if (createParent === filters) createParent.appendChild(createButton);
+            else createParent.prepend(createButton);
+        }
+        const pagerParent = narrow ? leftColumn : nativeToolbar;
+        if (paginationContainer && paginationContainer.parentElement !== pagerParent) pagerParent.appendChild(paginationContainer);
+    };
+    new ResizeObserver(syncLibraryLayout).observe(panel);
+    desktopLibraryQuery.addEventListener('change', syncLibraryLayout);
+    shortTouchQuery.addEventListener('change', syncLibraryLayout);
+    syncLibraryLayout();
 
     const editorHead = createElement('header', 'mpp-editor-head');
     const editorBack = createElement('button', 'mpp-button mpp-editor-back');
@@ -2872,9 +4061,13 @@ function enhancePanel(panel) {
     makeGlobalSettingsCollapsible(rightColumn.querySelector('.persona_management_global_settings'));
     const creatorWorkspace = createPersonaWorkspace(panel, createButton, personaCounter, updateSpotlight);
     if (creatorWorkspace) shell.appendChild(creatorWorkspace);
+    const cleanupStage = createCleanupWorkspace(panel);
+    shell.appendChild(cleanupStage.workspace);
+    cleanupOpenButton.addEventListener('click', () => cleanupStage.open());
     const refreshRenderedLibrary = () => {
         decorateCards(avatarBlock);
         applyFilter();
+        renderTagFilters();
         updateSpotlight();
     };
     const sortController = createSortController({
@@ -2940,10 +4133,12 @@ function wirePersonaEvents() {
     personaEventsWired = true;
     const refresh = () => window.setTimeout(() => {
         document.querySelector(`${PANEL_SELECTOR}[data-mpp-enhanced='true']`)?.mppRefresh?.();
+        updateGlobalPersonaLauncher();
     }, 0);
     const avatarIdFrom = payload => typeof payload === 'string' ? payload : payload?.avatarId;
     eventSource.on(event_types.PERSONA_CHANGED, payload => {
-        recordPersonaUse(avatarIdFrom(payload));
+        if (skipNextUsageRecord) skipNextUsageRecord = false;
+        else recordPersonaUse(avatarIdFrom(payload));
         refresh();
     });
     eventSource.on(event_types.PERSONA_UPDATED, payload => {
@@ -2974,6 +4169,7 @@ function scan(node = document) {
 function init() {
     ensureThemeIsolationStylesheet();
     wirePersonaEvents();
+    ensureGlobalPersonaLauncher();
     const existingPanel = document.querySelector(PANEL_SELECTOR);
     if (existingPanel) {
         enhancePanel(existingPanel);

@@ -21,7 +21,10 @@
     --mpp-surface-soft: color-mix(in srgb, var(--mpp-tint) 73%, rgba(255, 255, 255, 0.11));
     --mpp-panel-height: min(820px, calc(100dvh - var(--topBarBlockSize, 0px) - var(--bottomFormBlockSize, 0px) - 8px));
 
-    display: block !important;
+    /* Closed must be truly display:none: jQuery ':visible' only checks layout boxes,
+       and SillyTavern's Escape cascade closes the first visible drawer-content.
+       With display:block the closed panel hijacked that cascade and got toggled open. */
+    display: none !important;
     width: var(--sheldWidth) !important;
     min-width: min(450px, calc(100dvw - 8px));
     max-width: calc(100dvw - 8px) !important;
@@ -51,10 +54,19 @@
         transform 260ms cubic-bezier(0.2, 0.78, 0.2, 1),
         visibility 0s linear 280ms,
         border-color 170ms ease;
+    /* Keeps display:block alive until the closing transition ends (browsers without allow-discrete drop only this line). */
+    transition:
+        height 280ms cubic-bezier(0.2, 0.78, 0.2, 1),
+        opacity 170ms ease,
+        transform 260ms cubic-bezier(0.2, 0.78, 0.2, 1),
+        visibility 0s linear 280ms,
+        border-color 170ms ease,
+        display 280ms allow-discrete;
     container: mpp-panel / inline-size;
 }
 
 #PersonaManagement.mpp-panel.openDrawer {
+    display: block !important;
     height: var(--mpp-panel-height) !important;
     visibility: visible;
     pointer-events: auto;
@@ -62,6 +74,16 @@
     transform: translateY(0) scale(1);
     border-color: var(--mpp-border);
     transition-delay: 0s;
+}
+
+/* From-values for opening out of display:none (browsers without @starting-style just open instantly). */
+@starting-style {
+    #PersonaManagement.mpp-panel.openDrawer {
+        height: 0 !important;
+        visibility: hidden;
+        opacity: 0;
+        transform: translateY(-14px) scale(0.992);
+    }
 }
 
 #PersonaManagement.mpp-panel,
@@ -284,6 +306,7 @@
 }
 
 .mpp-spotlight-portrait {
+    position: relative;
     display: block;
     width: 42px;
     height: 42px;
@@ -298,7 +321,11 @@
     display: none !important;
 }
 
+/* Absolute so the inline crop offsets (left/top %) work below the desktop breakpoint too. */
 .mpp-spotlight-portrait img {
+    position: absolute;
+    top: 0;
+    left: 0;
     display: block;
     width: 100%;
     height: 100%;
@@ -481,6 +508,302 @@
     font-size: calc(0.68rem + var(--mpp-font-adjust));
 }
 
+.mpp-spotlight-copy { gap: 4px; }
+
+.mpp-spotlight-chips {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mpp-spotlight-chips .mpp-badge { position: static; }
+.mpp-badge.is-favorite { color: var(--mpp-warning); }
+
+.mpp-spotlight-actions {
+    display: grid;
+    width: min(100%, 390px);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 5px;
+}
+
+#PersonaManagement.mpp-panel .mpp-spotlight-actions .mpp-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 10px;
+}
+
+#PersonaManagement.mpp-panel .mpp-spotlight-action.is-active {
+    color: color-mix(in srgb, var(--mpp-accent) 74%, white);
+    border-color: color-mix(in srgb, var(--mpp-accent) 60%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 18%, transparent);
+}
+
+#PersonaManagement.mpp-panel .mpp-spotlight-favorite.is-active {
+    color: var(--mpp-warning);
+    border-color: var(--mpp-warning);
+}
+
+.mpp-global-persona-launcher {
+    --mpp-accent: var(--SmartThemeQuoteColor, #a78bfa);
+    --mpp-tint: var(--SmartThemeBlurTintColor, #171522);
+    --mpp-text: var(--SmartThemeBodyColor, #f5f2ff);
+    --mpp-muted: color-mix(in srgb, var(--mpp-text) 62%, transparent);
+    --mpp-border: color-mix(in srgb, var(--SmartThemeBorderColor, #ffffff) 58%, transparent);
+
+    position: fixed;
+    z-index: 8990;
+    right: 14px;
+    bottom: calc(var(--bottomFormBlockSize, 0px) + 18px);
+    color: var(--mpp-text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    will-change: left, top;
+}
+
+.mpp-global-persona-launcher.is-hidden { display: none !important; }
+
+.mpp-global-persona-button {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    padding: 3px;
+    place-items: center;
+    overflow: hidden;
+    color: var(--mpp-text);
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 42%, var(--mpp-border));
+    border-radius: 50%;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.14), transparent 52%),
+        color-mix(in srgb, var(--mpp-tint) 86%, transparent);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-drag: none;
+    user-select: none;
+    transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.mpp-global-persona-button:hover,
+.mpp-global-persona-button:focus-visible {
+    transform: translateY(-1px);
+    border-color: var(--mpp-accent);
+    box-shadow: 0 14px 34px color-mix(in srgb, var(--mpp-accent) 18%, rgba(0, 0, 0, 0.42));
+}
+
+.mpp-global-persona-launcher.is-dragging {
+    user-select: none;
+}
+
+.mpp-global-persona-launcher.is-dragging .mpp-global-persona-button {
+    cursor: grabbing;
+    transform: scale(0.98);
+}
+
+.mpp-global-persona-button img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+.mpp-global-persona-fallback {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+    color: color-mix(in srgb, var(--mpp-accent) 74%, white);
+    font-weight: 800;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--mpp-accent) 14%, transparent);
+}
+
+.mpp-global-persona-popover {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    display: grid;
+    width: min(360px, calc(100dvw - 24px));
+    max-height: min(540px, calc(100dvh - 150px));
+    padding: 10px;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    gap: 8px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 38%, var(--mpp-border));
+    border-radius: 18px;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--mpp-accent) 10%, transparent), transparent 54%),
+        color-mix(in srgb, var(--mpp-tint) 94%, #0b0b10);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mpp-global-persona-popover[hidden] { display: none !important; }
+
+/* The launcher lives on <body>, outside the panel's [hidden] guard, and Font Awesome's own display beats the UA [hidden] rule. */
+.mpp-global-persona-launcher [hidden] { display: none !important; }
+
+.mpp-global-persona-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mpp-global-persona-title {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.mpp-global-persona-title strong { font-size: 0.9rem; }
+.mpp-global-persona-title small { color: var(--mpp-muted); font-size: 0.68rem; }
+
+.mpp-global-persona-head-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+}
+
+.mpp-global-persona-open,
+.mpp-global-persona-close {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--mpp-text);
+    border: 1px solid var(--mpp-border);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.045);
+    cursor: pointer;
+}
+
+.mpp-global-persona-open:hover,
+.mpp-global-persona-close:hover {
+    color: color-mix(in srgb, var(--mpp-accent) 72%, white);
+    border-color: color-mix(in srgb, var(--mpp-accent) 56%, var(--mpp-border));
+}
+
+.mpp-global-persona-search {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px;
+    color: var(--mpp-text);
+    border: 1px solid var(--mpp-border);
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.16);
+    font: inherit;
+}
+
+.mpp-global-persona-recent {
+    display: grid;
+    gap: 6px;
+    color: var(--mpp-muted);
+    font-size: 0.68rem;
+}
+
+.mpp-global-persona-recent-list {
+    display: flex;
+    gap: 6px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.mpp-global-persona-recent-list::-webkit-scrollbar { display: none; }
+
+.mpp-global-persona-list {
+    display: grid;
+    min-height: 0;
+    gap: 6px;
+    padding-right: 2px;
+    overflow-y: auto;
+}
+
+.mpp-global-persona-item {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    padding: 5px 8px 5px 5px;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    color: var(--mpp-text);
+    text-align: left;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    cursor: pointer;
+    font: inherit;
+}
+
+.mpp-global-persona-item:hover,
+.mpp-global-persona-item:focus-visible {
+    border-color: color-mix(in srgb, var(--mpp-accent) 56%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 13%, rgba(255, 255, 255, 0.05));
+}
+
+.mpp-global-persona-item[aria-selected='true'] {
+    border-color: var(--mpp-accent);
+    background: color-mix(in srgb, var(--mpp-accent) 16%, rgba(255, 255, 255, 0.06));
+}
+
+.mpp-global-persona-item img {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--mpp-tint) 84%, rgba(255, 255, 255, 0.06));
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+.mpp-global-persona-item-copy {
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+}
+
+.mpp-global-persona-item-copy strong,
+.mpp-global-persona-item-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mpp-global-persona-item-copy small {
+    color: var(--mpp-muted);
+    font-size: 0.64rem;
+}
+
+.mpp-global-persona-item > i { color: var(--mpp-accent); }
+
+.mpp-global-persona-item.is-compact {
+    min-width: 196px;
+    min-height: 42px;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+}
+
+.mpp-global-persona-item.is-compact img {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+}
+
+.mpp-global-persona-empty {
+    padding: 18px 10px;
+    color: var(--mpp-muted);
+    text-align: center;
+}
+
 /* Appearance popover — lives only inside this drawer. */
 .mpp-appearance {
     position: absolute;
@@ -608,6 +931,44 @@
 .mpp-range { width: 100%; accent-color: var(--mpp-accent); }
 .mpp-range-output { color: color-mix(in srgb, var(--mpp-accent) 68%, var(--mpp-text)); font-variant-numeric: tabular-nums; text-align: right; }
 .mpp-color-input { width: 44px; height: 32px; padding: 3px; border: 1px solid var(--mpp-border); border-radius: 9px; background: rgba(255,255,255,.05); cursor: pointer; }
+
+#PersonaManagement.mpp-panel .mpp-toggle {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    margin: 0;
+    flex: 0 0 auto;
+    appearance: none;
+    border: 1px solid var(--mpp-border);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.22);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+#PersonaManagement.mpp-panel .mpp-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--mpp-muted);
+    transition: transform 140ms ease, background-color 140ms ease;
+}
+
+#PersonaManagement.mpp-panel .mpp-toggle:checked {
+    border-color: var(--mpp-accent);
+    background: color-mix(in srgb, var(--mpp-accent) 32%, rgba(0, 0, 0, 0.2));
+}
+
+#PersonaManagement.mpp-panel .mpp-toggle:checked::after {
+    transform: translateX(20px);
+    background: var(--mpp-accent);
+}
+
+#PersonaManagement.mpp-panel .mpp-toggle:focus-visible { outline: 2px solid var(--mpp-accent); outline-offset: 2px; }
 #PersonaManagement.mpp-panel .mpp-reset { width: max-content; min-height: 32px; justify-self: end; }
 
 /* Workspace */
@@ -699,6 +1060,247 @@
     width: max-content;
     padding-inline: 11px;
     border-radius: 999px;
+}
+
+/* Library cleanup workspace. Same stage pattern as the creator: replaces library + spotlight. */
+#PersonaManagement.mpp-panel.mpp-cleaning :is(.mpp-spotlight, .mpp-main) {
+    display: none !important;
+}
+
+.mpp-cleanup[hidden] { display: none !important; }
+
+.mpp-cleanup {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 9px;
+    padding: 10px;
+    overflow: hidden;
+    color: var(--mpp-text);
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--mpp-surface) 92%, transparent);
+}
+
+.mpp-cleanup-top {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mpp-cleanup-title { display: grid; min-width: 0; gap: 2px; }
+.mpp-cleanup-title strong { font-size: calc(0.94rem + var(--mpp-font-adjust)); }
+.mpp-cleanup-title small { color: var(--mpp-muted); font-size: calc(0.62rem + var(--mpp-font-adjust)); }
+
+.mpp-cleanup-top-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+
+#PersonaManagement.mpp-panel .mpp-cleanup-days {
+    min-height: 32px;
+    padding: 0 8px;
+    color: var(--mpp-text);
+    border: 1px solid var(--mpp-border);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--mpp-tint) 82%, rgba(0, 0, 0, 0.2));
+}
+
+#PersonaManagement.mpp-panel :is(.mpp-cleanup-back, .mpp-cleanup-backup) {
+    width: max-content;
+    min-height: 34px;
+    padding: 6px 14px;
+    border-radius: 999px;
+}
+
+.mpp-cleanup-body {
+    display: grid;
+    min-height: 0;
+    flex: 1 1 auto;
+    align-content: start;
+    gap: 10px;
+    padding-right: 2px;
+    overflow-y: auto;
+}
+
+.mpp-cleanup-group {
+    display: grid;
+    gap: 6px;
+    padding: 9px;
+    border: 1px solid color-mix(in srgb, var(--mpp-border) 78%, transparent);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.mpp-cleanup-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mpp-cleanup-group-title { display: flex; min-width: 0; align-items: baseline; gap: 4px; }
+.mpp-cleanup-group-title strong { overflow: hidden; font-size: calc(0.82rem + var(--mpp-font-adjust)); text-overflow: ellipsis; white-space: nowrap; }
+.mpp-cleanup-group-title small { color: var(--mpp-muted); }
+
+.mpp-cleanup-group-hint { color: var(--mpp-muted); font-size: calc(0.62rem + var(--mpp-font-adjust)); }
+
+#PersonaManagement.mpp-panel .mpp-cleanup-select-group {
+    width: max-content;
+    min-height: 28px;
+    padding: 4px 10px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    font-size: calc(0.66rem + var(--mpp-font-adjust));
+}
+
+.mpp-cleanup-rows { display: grid; gap: 5px; }
+
+.mpp-cleanup-row {
+    display: grid;
+    min-width: 0;
+    padding: 5px 8px 5px 5px;
+    grid-template-columns: auto 30px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    color: var(--mpp-text);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.mpp-cleanup-row:has(.mpp-cleanup-check:checked) {
+    border-color: color-mix(in srgb, var(--mpp-accent) 56%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 13%, rgba(255, 255, 255, 0.05));
+}
+
+.mpp-cleanup-row.is-protected { opacity: 0.62; }
+
+.mpp-cleanup-check { width: 16px; height: 16px; margin: 0 2px; accent-color: var(--mpp-accent); }
+
+.mpp-cleanup-row img {
+    width: 30px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: 9px;
+    background: var(--mpp-surface);
+}
+
+.mpp-cleanup-row-copy { display: grid; min-width: 0; gap: 1px; }
+.mpp-cleanup-row-copy strong,
+.mpp-cleanup-row-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mpp-cleanup-row-copy small { color: var(--mpp-muted); font-size: calc(0.6rem + var(--mpp-font-adjust)); }
+
+.mpp-cleanup-protected {
+    color: var(--mpp-muted);
+    font-size: calc(0.6rem + var(--mpp-font-adjust));
+    white-space: nowrap;
+}
+
+#PersonaManagement.mpp-panel .mpp-cleanup-details {
+    display: inline-flex;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    font-size: calc(0.72rem + var(--mpp-font-adjust));
+}
+
+/* The details popup lives outside the panel, so it cannot rely on panel variables. */
+.mpp-cleanup-details-view {
+    display: grid;
+    min-width: 0;
+    gap: 10px;
+    text-align: left;
+    /* Fallbacks for .mpp-badge rules that reference panel variables. */
+    --mpp-font-adjust: 0px;
+    --mpp-accent: #9b8cf2;
+    --mpp-warning: #f2c94c;
+}
+.mpp-cleanup-details-head { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.mpp-cleanup-details-head img {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border-radius: 12px;
+}
+.mpp-cleanup-details-title { display: grid; min-width: 0; gap: 2px; }
+.mpp-cleanup-details-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpp-cleanup-details-title small { opacity: 0.6; overflow-wrap: anywhere; }
+.mpp-cleanup-details-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.mpp-cleanup-details-badges .mpp-badge { position: static; }
+.mpp-cleanup-details-badges[hidden] { display: none; }
+.mpp-cleanup-details-desc {
+    max-height: 30vh;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.mpp-cleanup-details-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.mpp-cleanup-details-tags[hidden] { display: none; }
+.mpp-cleanup-details-tag {
+    display: inline-flex;
+    padding: 2px 8px;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    opacity: 0.85;
+}
+.mpp-cleanup-details-tag > i { font-size: 0.85em; opacity: 0.75; }
+.mpp-cleanup-details-meta { display: grid; margin: 0; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; }
+.mpp-cleanup-details-meta dt { opacity: 0.6; }
+.mpp-cleanup-details-meta dd { margin: 0; }
+.mpp-cleanup-details-hint { opacity: 0.6; }
+
+.mpp-cleanup-empty {
+    padding: 22px 12px;
+    color: var(--mpp-muted);
+    text-align: center;
+}
+
+.mpp-cleanup-bar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 2px;
+}
+
+.mpp-cleanup-selected { margin-right: auto; color: var(--mpp-muted); font-size: calc(0.66rem + var(--mpp-font-adjust)); }
+
+#PersonaManagement.mpp-panel :is(.mpp-cleanup-export, .mpp-cleanup-delete) {
+    width: max-content;
+    min-height: 34px;
+    padding: 6px 14px;
+    border-radius: 999px;
+}
+
+#PersonaManagement.mpp-panel .mpp-cleanup-delete {
+    color: var(--mpp-danger);
+    border-color: color-mix(in srgb, var(--mpp-danger) 55%, var(--mpp-border));
+}
+
+.mpp-library-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+
+@container mpp-panel (max-width: 560px) {
+    .mpp-cleanup-top { flex-wrap: wrap; }
+    .mpp-cleanup-row { grid-template-columns: auto 26px minmax(0, 1fr) auto; }
+    .mpp-cleanup-protected { display: none; }
+    .mpp-cleanup-bar { flex-wrap: wrap; }
 }
 
 /* Persona creation workspace. It replaces the library without cloning native editor DOM. */
@@ -883,7 +1485,21 @@
     border-bottom: 2px solid color-mix(in srgb, var(--mpp-accent) 38%, var(--mpp-border));
 }
 
-.mpp-creator-identity-copy { min-width: 130px; flex: 1 1 auto; }
+.mpp-creator-identity-copy {
+    display: grid;
+    min-width: 130px;
+    flex: 1 1 auto;
+    gap: 5px;
+}
+
+.mpp-creator-meta {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mpp-creator-meta .mpp-badge { position: static; }
 
 .mpp-creator-actions {
     display: flex;
@@ -912,6 +1528,12 @@
 #PersonaManagement.mpp-panel .mpp-creator-connection:disabled {
     cursor: progress;
     opacity: 0.68;
+}
+
+#PersonaManagement.mpp-panel .mpp-creator-actions > button.mpp-creator-delete {
+    margin-left: auto;
+    color: color-mix(in srgb, var(--mpp-danger) 74%, var(--mpp-text));
+    border-color: color-mix(in srgb, var(--mpp-danger) 42%, var(--mpp-border));
 }
 
 #PersonaManagement.mpp-panel .mpp-creator-delete:hover {
@@ -959,6 +1581,14 @@
     border: 1px solid var(--mpp-border);
     border-radius: 26px;
     background: color-mix(in srgb, var(--mpp-surface) 88%, transparent);
+    transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.mpp-creator-field:focus-within,
+.mpp-creator-tool-stage:focus-within,
+#PersonaManagement.mpp-panel .mpp-creator-photo:focus-within {
+    border-color: color-mix(in srgb, var(--mpp-accent) 58%, var(--mpp-border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--mpp-accent) 16%, transparent);
 }
 
 .mpp-creator-field-head {
@@ -971,11 +1601,105 @@
 
 .mpp-creator-field-head > strong,
 .mpp-creator-notes > strong {
+    display: inline-flex;
     padding-inline: 10px;
+    align-items: center;
+    gap: 8px;
     color: var(--mpp-text);
     font-size: calc(1rem + var(--mpp-font-adjust));
     letter-spacing: 0.035em;
     text-transform: uppercase;
+}
+
+.mpp-creator-field-head > strong i,
+.mpp-creator-notes > strong i {
+    color: var(--mpp-accent);
+    font-size: 0.82em;
+}
+
+.mpp-creator-tags > strong {
+    display: inline-flex;
+    padding-inline: 10px;
+    align-items: center;
+    gap: 8px;
+    color: var(--mpp-text);
+    font-size: calc(1rem + var(--mpp-font-adjust));
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.mpp-creator-tags > strong i { color: var(--mpp-accent); font-size: 0.82em; }
+
+.mpp-creator-tags > small {
+    padding-inline: 10px;
+    color: var(--mpp-muted);
+    font-size: calc(0.62rem + var(--mpp-font-adjust));
+}
+
+.mpp-tags-editor {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
+    border: 1px solid var(--mpp-border);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--mpp-tint) 82%, rgba(0, 0, 0, 0.2));
+}
+
+#PersonaManagement.mpp-panel .mpp-tags-input {
+    min-width: 110px;
+    min-height: 26px;
+    padding: 2px 4px;
+    flex: 1 1 110px;
+    color: var(--mpp-text);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.mpp-tag-chip {
+    display: inline-flex;
+    min-height: 24px;
+    padding: 2px 5px 2px 8px;
+    align-items: center;
+    gap: 5px;
+    color: color-mix(in srgb, var(--mpp-accent) 70%, var(--mpp-text));
+    font-size: calc(0.64rem + var(--mpp-font-adjust));
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 45%, var(--mpp-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mpp-accent) 14%, transparent);
+}
+
+.mpp-tag-chip > i { font-size: 0.85em; opacity: 0.75; }
+
+#PersonaManagement.mpp-panel .mpp-tag-remove {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    padding: 0;
+    color: inherit;
+    font-size: calc(0.78rem + var(--mpp-font-adjust));
+    line-height: 1;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
+#PersonaManagement.mpp-panel .mpp-tag-remove:hover {
+    color: var(--mpp-danger);
+    background: color-mix(in srgb, var(--mpp-danger) 18%, transparent);
+}
+
+.mpp-creator-counter {
+    margin-left: auto;
+    padding-inline: 8px;
+    color: var(--mpp-muted);
+    font-size: calc(0.64rem + var(--mpp-font-adjust));
+    font-variant-numeric: tabular-nums;
 }
 
 #PersonaManagement.mpp-panel .mpp-creator-description-expand {
@@ -1005,7 +1729,22 @@
     border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
     border-radius: 20px;
     background: color-mix(in srgb, var(--mpp-accent) 5%, var(--mpp-surface));
+    transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
+
+.mpp-creator-tool-stage-head {
+    display: flex;
+    margin: -2px -2px 2px;
+    padding: 0 8px 8px;
+    align-items: center;
+    color: var(--mpp-muted);
+    font-size: calc(0.68rem + var(--mpp-font-adjust));
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid color-mix(in srgb, var(--mpp-border) 70%, transparent);
+}
+
+.mpp-creator-tool-stage-head strong { font: inherit; }
 
 .mpp-creator-tool-panel {
     display: grid;
@@ -1362,6 +2101,8 @@
 }
 
 #PersonaManagement.mpp-panel #persona_pagination_container:empty { display: none; }
+/* The native pagination plugin can re-inject its markup next to our custom pager; while ours owns the container, hide it. */
+#PersonaManagement.mpp-panel #persona_pagination_container.mpp-has-custom-pager .paginationjs { display: none !important; }
 #PersonaManagement.mpp-panel #persona_pagination_container .paginationjs { display: flex; align-items: center; justify-content: center; gap: 3px; }
 
 .mpp-filters {
@@ -1401,6 +2142,15 @@
     background: color-mix(in srgb, var(--mpp-accent) 20%, rgba(255, 255, 255, 0.045));
 }
 
+/* Stays pinned to the end of the scrollable chip row, so creation is always one tap away. */
+#PersonaManagement.mpp-panel .mpp-create-persona {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: color-mix(in srgb, var(--mpp-tint) 84%, var(--mpp-accent) 16%);
+    box-shadow: -10px 0 14px -6px color-mix(in srgb, var(--mpp-tint) 90%, transparent);
+}
+
 .mpp-filter {
     display: inline-flex;
     flex: 0 0 auto;
@@ -1419,6 +2169,9 @@
 }
 
 .mpp-filter:hover { color: var(--mpp-text); border-color: color-mix(in srgb, var(--mpp-accent) 44%, var(--mpp-border)); }
+
+.mpp-filter-tags { display: contents; }
+.mpp-filter-tag > i { font-size: 0.85em; opacity: 0.75; }
 .mpp-filter.is-active { color: color-mix(in srgb, var(--mpp-accent) 76%, var(--mpp-text)); border-color: var(--mpp-accent); background: color-mix(in srgb, var(--mpp-accent) 15%, transparent); }
 
 /* Persona shelf: same visual idea as the reference, on SillyTavern's own cards. */
@@ -1430,6 +2183,8 @@
     max-height: none;
     padding: 2px 3px 3px 2px;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    grid-auto-rows: 156px;
     align-content: start;
     gap: 12px;
     overflow-x: hidden;
@@ -1439,11 +2194,14 @@
 
 #PersonaManagement.mpp-panel #user_avatar_block.gridView {
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
 }
 
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'],
 #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'] {
     grid-template-columns: repeat(auto-fill, minmax(242px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 242px), 1fr));
+    grid-auto-rows: auto;
     gap: 8px;
 }
 
@@ -1581,9 +2339,10 @@
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card {
     padding: 3px;
     min-height: 116px;
-    height: 116px;
+    height: auto;
     grid-template-columns: 80px minmax(0, 1fr);
     border-radius: 14px;
+    contain-intrinsic-size: 242px 116px;
 }
 
 #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .avatar {
@@ -1611,20 +2370,25 @@
 }
 
 .mpp-card-actions {
-    display: flex;
+    display: grid;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     padding: 0 8px 8px 2px;
     grid-column: 2;
     grid-row: 2;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     align-items: center;
+    align-self: end;
     gap: 5px;
 }
 
 .mpp-card-action {
     display: inline-flex;
-    width: 34px;
+    width: 100%;
     height: 34px;
-    min-width: 34px;
+    min-width: 0;
     min-height: 34px;
     padding: 0;
     align-items: center;
@@ -1646,6 +2410,8 @@
 }
 
 .mpp-card-action:focus-visible { outline: 2px solid var(--mpp-accent); outline-offset: 1px; }
+.mpp-card-action i { flex: 0 0 auto; pointer-events: none; }
+.mpp-card-edit-label { display: none; }
 .mpp-card-action.mpp-action-favorite.is-active { color: var(--mpp-warning); border-color: var(--mpp-warning); }
 .mpp-card-action.mpp-action-delete:hover { color: var(--mpp-danger); border-color: var(--mpp-danger); }
 
@@ -1715,6 +2481,8 @@
     border-radius: 9px;
 }
 
+#PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-badges { max-width: 72px; }
+
 .mpp-card-badges {
     position: absolute;
     z-index: 2;
@@ -1722,11 +2490,69 @@
     left: 11px;
     right: auto;
     display: flex;
-    max-width: calc(100% - 22px);
+    max-width: 100px;
     flex-wrap: wrap;
     justify-content: flex-start;
     gap: 3px;
     pointer-events: none;
+}
+
+/* Card badges are icon-only so they never spill over the persona name; full text chips live in the spotlight. */
+.mpp-card-badges .mpp-badge {
+    width: 20px;
+    padding: 0;
+    justify-content: center;
+}
+
+.mpp-card-badges .mpp-badge span { display: none; }
+
+/* Tag chips on cards: one compact line under the description, clickable as filter shortcuts. */
+#PersonaManagement.mpp-panel .mpp-persona-card .mpp-card-tags {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    padding-top: 2px;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+}
+
+#PersonaManagement.mpp-panel .mpp-persona-card .mpp-card-tag {
+    display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 1px 7px;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--mpp-muted);
+    border: 1px solid var(--mpp-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.035);
+    font-size: calc(0.58rem + var(--mpp-font-adjust));
+    line-height: 1.5;
+    cursor: pointer;
+    transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+#PersonaManagement.mpp-panel .mpp-persona-card .mpp-card-tag:hover {
+    color: color-mix(in srgb, var(--mpp-accent) 62%, var(--mpp-text));
+    border-color: color-mix(in srgb, var(--mpp-accent) 44%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 10%, rgba(255, 255, 255, 0.035));
+}
+
+#PersonaManagement.mpp-panel .mpp-persona-card .mpp-card-tag > i { font-size: 0.85em; opacity: 0.75; }
+
+#PersonaManagement.mpp-panel .mpp-persona-card .mpp-card-tag > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#PersonaManagement.mpp-panel .mpp-persona-card .mpp-card-tag-more {
+    flex: 0 0 auto;
+    color: var(--mpp-muted);
+    font-size: calc(0.58rem + var(--mpp-font-adjust));
 }
 
 .mpp-badge {
@@ -1750,7 +2576,8 @@
 .mpp-badge.is-active { color: #9cebc8; }
 .mpp-badge.is-default { color: #f4d58d; }
 .mpp-badge.is-chat,
-.mpp-badge.is-character { color: color-mix(in srgb, var(--mpp-accent) 72%, white); }
+.mpp-badge.is-character,
+.mpp-badge.is-tag { color: color-mix(in srgb, var(--mpp-accent) 72%, white); }
 
 /* Native editor, visually integrated instead of replaced. */
 .mpp-editor-column > .persona_management_current_persona,
@@ -1839,6 +2666,7 @@
     .mpp-editor-column .menu_button, .mpp-editor-column .text_pole,
     .mpp-editor-column select, .mpp-editor-column textarea,
     .mpp-creator button, .mpp-creator input, .mpp-creator select, .mpp-creator textarea,
+    .mpp-cleanup select, .mpp-cleanup input,
     .mpp-pager-size
 ) {
     color: var(--mpp-text) !important;
@@ -1901,6 +2729,28 @@
 #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-card-action.mpp-action-favorite.is-active {
     color: var(--mpp-warning) !important;
     border-color: var(--mpp-warning) !important;
+}
+
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-button.mpp-spotlight-action.is-active {
+    color: color-mix(in srgb, var(--mpp-accent) 74%, white) !important;
+    border-color: color-mix(in srgb, var(--mpp-accent) 60%, var(--mpp-border)) !important;
+    background-color: color-mix(in srgb, var(--mpp-accent) 18%, transparent) !important;
+}
+
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-button.mpp-spotlight-favorite.is-active {
+    color: var(--mpp-warning) !important;
+    border-color: var(--mpp-warning) !important;
+}
+
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-tag-remove {
+    color: inherit !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+#PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-tags-input {
+    color: var(--mpp-text) !important;
+    background: transparent !important;
 }
 
 #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-card-action.mpp-action-delete:hover {
@@ -1976,35 +2826,121 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
 }
 
 @container mpp-panel (max-width: 560px) {
-    #PersonaManagement.mpp-panel > .flex-container { padding: 10px; gap: 8px; }
-    .mpp-brand-icon { flex-basis: 38px; width: 38px; height: 38px; border-radius: 12px; }
+    #PersonaManagement.mpp-panel > .flex-container { padding: 10px; gap: 10px; }
     .mpp-brand-copy > small { display: none; }
+    .mpp-hero { gap: 8px; }
+    .mpp-hero-actions, .mpp-native-actions { flex: 0 0 auto; flex-wrap: nowrap; }
+    .mpp-title-row h2 { font-size: calc(1rem + var(--mpp-font-adjust)); white-space: normal; }
+    /* The base button selector otherwise overrides display:none on narrow screens. */
+    #PersonaManagement.mpp-panel .mpp-window-mode-button { display: none; }
     #PersonaManagement.mpp-panel .mpp-native-actions .menu_button,
-    #PersonaManagement.mpp-panel .mpp-button { min-width: 32px; min-height: 32px; padding: 6px 8px; }
-    .mpp-spotlight { grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; padding: 7px 8px; }
-    .mpp-spotlight-portrait { width: 42px; height: 42px; }
-    .mpp-spotlight-edit span { display: none; }
+    #PersonaManagement.mpp-panel .mpp-hero-actions > .mpp-button {
+        width: 40px; min-width: 40px; min-height: 40px; padding: 0;
+    }
+    .mpp-spotlight { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); padding: 10px; gap: 4px 10px; }
+    /* A small panoramic crop with the same feathered edge as the desktop banner.
+       The existing ResizeObserver recalculates the saved crop for this frame. */
+    .mpp-spotlight-portrait {
+        width: 100%;
+        height: 78px;
+        border: 0;
+        border-radius: 12px 0 0 12px;
+        box-shadow: none;
+        -webkit-mask-image: linear-gradient(to right, #000 0%, #000 52%, rgba(0, 0, 0, 0.88) 65%, transparent 100%);
+        mask-image: linear-gradient(to right, #000 0%, #000 52%, rgba(0, 0, 0, 0.88) 65%, transparent 100%);
+    }
+    .mpp-spotlight-portrait img { object-fit: contain; }
+    .mpp-spotlight-copy { display: contents; }
+    .mpp-spotlight-portrait { grid-column: 1; grid-row: 1 / 4; }
+    .mpp-spotlight-copy > small { grid-column: 2; grid-row: 1; align-self: end; }
+    .mpp-spotlight-copy > strong { grid-column: 2; grid-row: 2; }
+    .mpp-spotlight-chips { grid-column: 2; grid-row: 3; align-self: start; }
+    .mpp-spotlight-copy strong { font-size: calc(1.1rem + var(--mpp-font-adjust)); }
+    .mpp-spotlight-copy small { font-size: 0.65rem; letter-spacing: 0.06em; }
+    .mpp-spotlight-copy > .mpp-spotlight-status { display: none; }
+    .mpp-spotlight-actions { display: grid; width: 100%; margin-top: 6px; grid-column: 1 / -1; grid-row: 4; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+    #PersonaManagement.mpp-panel .mpp-spotlight-actions .mpp-spotlight-action { width: 100%; min-width: 0; min-height: 40px; padding: 0; }
+    .mpp-spotlight-chips { gap: 4px; }
+    .mpp-spotlight-chips .mpp-badge:not(.is-tag) { width: 20px; padding: 0; justify-content: center; }
+    .mpp-spotlight-chips .mpp-badge:not(.is-tag) span { display: none; }
+    .mpp-badge.is-tag { max-width: 100%; }
+    .mpp-badge.is-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mpp-appearance { inset: 58px 0 0; width: 100%; max-height: none; border-radius: 16px 16px 0 0; }
+    #PersonaManagement.mpp-panel :is(.mpp-appearance, .mpp-creator, .mpp-cleanup),
+    #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(.mpp-appearance, .mpp-creator, .mpp-cleanup) {
+        background-color: var(--mpp-tint) !important;
+    }
     .mpp-theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .mpp-setting-row { align-items: stretch; flex-direction: column; gap: 7px; }
     .mpp-range-wrap { width: 100%; }
     .mpp-library-column { min-height: 0; padding: 0; }
+    /* One scroll surface lets the library breathe even on short phones and with a keyboard. */
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed:not(.mpp-creating):not(.mpp-cleaning) > .flex-container { overflow-y: auto; overscroll-behavior-y: contain; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed .mpp-main { flex: 0 0 auto; overflow: visible; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed .mpp-library-column { height: auto; overflow: visible !important; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed #user_avatar_block { flex: 0 0 auto; overflow: visible; }
+    .mpp-library-header { flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+    .mpp-library-copy { flex: 1 0 100%; }
+    .mpp-library-header h3 { font-size: calc(0.95rem + var(--mpp-font-adjust)); line-height: 1.3; }
+    .mpp-library-actions { width: 100%; justify-content: space-between; }
+    .mpp-density { padding: 2px; gap: 2px; }
+    #PersonaManagement.mpp-panel .mpp-density-button,
+    #PersonaManagement.mpp-panel .mpp-mobile-density button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
+    #PersonaManagement.mpp-panel .mpp-cleanup-open { width: 44px; min-height: 44px; padding: 0; }
     .mpp-mobile-density { display: flex; }
+    /* Native mobile CSS caps sorting at four characters. Give it its own full row. */
+    #PersonaManagement.mpp-panel .mpp-library-toolbar { grid-template-columns: 44px minmax(0, 1fr) !important; gap: 8px !important; }
+    #PersonaManagement.mpp-panel .mpp-library-toolbar input { grid-column: 2; grid-row: 1; min-height: 44px !important; font-size: 16px; }
+    #PersonaManagement.mpp-panel .mpp-create-persona { position: static; width: 44px; min-height: 44px; padding: 0; font-size: 0; box-shadow: none; }
+    #PersonaManagement.mpp-panel .mpp-create-persona i { font-size: 16px; }
+    #PersonaManagement.mpp-panel .mpp-create-persona span { display: none; }
+    #PersonaManagement.mpp-panel .mpp-library-toolbar #persona_sort_order {
+        grid-column: 1 / -1; grid-row: 2; width: 100% !important; max-width: none !important; min-height: 40px; font-size: 14px;
+    }
+    #PersonaManagement.mpp-panel #persona_pagination_container { grid-row: 3; flex: 0 0 auto; margin: 10px 0 0; }
+    .mpp-custom-pager { flex-wrap: wrap; gap: 4px; }
+    .mpp-pager-label { min-width: 0; margin-right: auto; font-size: 12px; }
+    #PersonaManagement.mpp-panel .mpp-pager-size { min-width: 0; max-width: 105px; min-height: 40px; font-size: 14px; }
+    #PersonaManagement.mpp-panel .mpp-pager-button { width: 40px; min-width: 40px; min-height: 40px; }
+    #PersonaManagement.mpp-panel .mpp-filter { min-height: 40px; font-size: 13px; padding: 6px 10px; }
     #PersonaManagement.mpp-panel #user_avatar_block,
-    #PersonaManagement.mpp-panel #user_avatar_block.gridView { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    #PersonaManagement.mpp-panel #user_avatar_block.gridView { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content !important; gap: 10px; scrollbar-gutter: auto; }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card {
+        height: auto !important; min-height: 0 !important; max-width: none !important; padding: 6px !important;
+        grid-template-columns: 82px minmax(0, 1fr); grid-template-rows: auto auto; gap: 8px !important;
+        border-radius: 16px; content-visibility: visible !important; contain: none !important;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card .avatar {
+        grid-row: 1; width: 82px !important; min-width: 0 !important; max-width: none !important;
+        height: 100px !important; max-height: none !important; padding: 0 !important; border-radius: 12px !important;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card .character_select_container {
+        position: static !important; flex: 0 0 auto !important; min-height: 0; height: auto !important;
+        max-width: none !important; padding: 8px 4px 0 !important; gap: 5px;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card .character_name_block { position: static !important; min-height: min-content; flex: 0 0 auto !important; }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card :is(.ch_name, .ch_additional_info, .ch_description) {
+        position: static !important; max-width: none !important; margin: 0 !important; flex: 0 0 auto !important; height: auto !important;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card .ch_name { font-size: calc(15px + var(--mpp-font-adjust)); line-height: 1.3; }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-persona-card :is(.ch_additional_info, .ch_description) { font-size: 12px; line-height: 1.35; }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-card-actions {
+        grid-column: 1 / -1; grid-row: 2; padding: 0 !important; gap: 5px;
+    }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-card-action { width: 100%; min-width: 0; height: 40px; min-height: 40px; font-size: 14px; border-radius: 10px; }
+    #PersonaManagement.mpp-panel #user_avatar_block .mpp-card-badges { top: 10px; left: 10px; max-width: 74px; }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'],
-    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'] { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'] { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'][data-mpp-mobile-columns='2'],
     #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'][data-mpp-mobile-columns='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'][data-mpp-mobile-columns='4'],
     #PersonaManagement.mpp-panel #user_avatar_block.gridView[data-mpp-density='compact'][data-mpp-mobile-columns='4'] { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card {
-        display: flex !important;
-        height: auto;
-        min-height: 0;
-        padding: 3px;
-        flex-direction: column;
-        gap: 4px;
-        border-radius: 15px;
+        display: grid !important;
+        padding: 4px !important;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: max-content max-content auto;
+        gap: 6px !important;
     }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .avatar {
         width: 100% !important;
@@ -2014,59 +2950,114 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
         max-height: none !important;
         aspect-ratio: 1 / 1 !important;
         border-radius: 12px !important;
+        grid-column: 1;
+        grid-row: 1;
     }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .character_select_container {
         width: 100% !important;
-        padding: 2px 3px 0;
+        grid-column: 1;
+        grid-row: 2;
+        padding: 0 3px !important;
         align-items: center;
     }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .character_name_block { align-items: center; }
-    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card :is(.ch_name, .ch_additional_info, .ch_description) { text-align: center; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card .ch_name { font-size: calc(12px + var(--mpp-font-adjust)); text-align: center; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-persona-card :is(.ch_additional_info, .ch_description, .mpp-card-tags) { display: none !important; }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-actions {
         display: grid;
         width: 100%;
-        padding: 0 2px 2px;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 3px;
+        grid-row: 3;
+        grid-template-columns: minmax(0, 1fr);
+        grid-auto-flow: row;
     }
     #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-action {
         width: 100%;
         min-width: 0;
-        height: 27px;
-        min-height: 27px;
+        height: 40px;
+        min-height: 40px;
         border-radius: 8px;
     }
-    .mpp-badge span { display: none; }
-    .mpp-badge { width: 20px; padding: 0; justify-content: center; }
+    /* All operations remain in the editor; the dense grid has one usable entry point. */
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-action:not(.mpp-action-edit) { display: none; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-action-edit { gap: 6px; font-size: 12px; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-edit-label { display: inline; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-mobile-columns='4'] .mpp-card-edit-label { display: none; }
+    #PersonaManagement.mpp-panel #user_avatar_block[data-mpp-density='compact'] .mpp-card-badges { top: 8px; left: 8px; max-width: calc(100% - 16px); }
+
+    /* Natural-height children in one scrollport: min-height:0 grid rows used to collapse
+       the fields while their contents painted across the following rows. */
+    .mpp-creator { padding: 10px; border-radius: 16px; }
+    .mpp-creator-top { gap: 8px; }
+    #PersonaManagement.mpp-panel :is(.mpp-creator-back, .mpp-creator-save) { width: auto; min-height: 44px; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.3; }
+    #PersonaManagement.mpp-panel .mpp-creator-back { flex: 0 0 44px; width: 44px; padding: 0; }
+    .mpp-creator-back span { display: none; }
+    .mpp-creator-body { display: flex; flex-direction: column; gap: 14px; overflow: hidden auto; overscroll-behavior-y: contain; }
+    .mpp-creator-body > * { flex: 0 0 auto; }
+    .mpp-creator-left { grid-template-rows: auto; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); align-content: start; gap: 10px; overflow: visible; }
+    .mpp-creator-photo-frame { height: auto; aspect-ratio: 3 / 4; }
+    #PersonaManagement.mpp-panel .mpp-creator-photo { border-radius: 16px; }
+    .mpp-creator-tools { align-content: start; gap: 6px; }
+    #PersonaManagement.mpp-panel .mpp-creator-tool { min-height: 44px; padding: 8px; gap: 7px; border-radius: 12px; font-size: 12px; text-align: left; }
+    .mpp-creator-tool span { overflow-wrap: anywhere; }
+    .mpp-creator-tool-stage, .mpp-creator-linked { grid-column: 1 / -1; border-radius: 14px; }
+    #PersonaManagement.mpp-panel .mpp-creator-linked-list { width: 100%; grid-template-columns: repeat(auto-fill, 44px); }
+    .mpp-creator-right { display: flex; flex-direction: column; gap: 12px; overflow: visible; }
+    .mpp-creator-right > * { flex: 0 0 auto; }
+    .mpp-creator-identity { padding: 2px 0 12px; flex-direction: column; align-items: stretch; gap: 10px; }
+    .mpp-creator-identity-copy { min-width: 0; }
+    .mpp-creator-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    #PersonaManagement.mpp-panel .mpp-creator-actions > button { width: 100%; height: 44px; min-width: 0; min-height: 44px; margin: 0; }
+    .mpp-creator-field { padding: 10px; border-radius: 16px; }
+    .mpp-creator-field-head { flex-wrap: wrap; gap: 6px; }
+    .mpp-creator-field-head > strong, .mpp-creator-notes > strong, .mpp-creator-tags > strong { padding: 0; font-size: 13px; letter-spacing: 0.02em; }
+    #PersonaManagement.mpp-panel .mpp-creator-description-input { min-height: 220px; font-size: 16px; }
+    #PersonaManagement.mpp-panel .mpp-creator-notes textarea { min-height: 120px; font-size: 16px; }
+    #PersonaManagement.mpp-panel .mpp-tags-input { min-height: 40px; font-size: 16px; }
+    .mpp-tag-chip { max-width: 100%; overflow-wrap: anywhere; }
+    #PersonaManagement.mpp-panel .mpp-tag-remove { flex: 0 0 32px; width: 32px; height: 32px; }
+    .mpp-creator-notes small, .mpp-creator-tags > small { padding: 0; font-size: 12px; line-height: 1.45; }
+    .mpp-creator.is-description-expanded .mpp-creator-description { position: static; }
+    .mpp-creator.is-description-expanded .mpp-creator-description-input { min-height: 60dvh !important; }
+    .mpp-creator.is-description-expanded :is(.mpp-creator-tool-stage, .mpp-creator-notes) { visibility: visible; }
+    .mpp-cleanup-title small { font-size: 12px; line-height: 1.4; }
+    .mpp-cleanup-top-actions { width: 100%; }
+    #PersonaManagement.mpp-panel :is(.mpp-cleanup-days, .mpp-cleanup-back, .mpp-cleanup-backup, .mpp-cleanup-select-group, .mpp-cleanup-details, .mpp-cleanup-export, .mpp-cleanup-delete) { min-height: 44px; }
+    #PersonaManagement.mpp-panel .mpp-cleanup-details { min-width: 40px; }
+    .mpp-cleanup-row { min-height: 56px; }
+    .mpp-cleanup-selected { flex-basis: 100%; font-size: 12px; }
+    .mpp-cleanup-group-head { flex-wrap: wrap; }
 }
 
 @container mpp-panel (max-width: 390px) {
     .mpp-title-row h2 { font-size: calc(0.95rem + var(--mpp-font-adjust)); }
     .mpp-native-actions .user_stats_button { display: none !important; }
-    .mpp-spotlight-copy > span { display: none; }
-    .mpp-library-toolbar { grid-template-columns: auto minmax(0, 1fr) auto !important; }
+    .mpp-spotlight-copy > .mpp-spotlight-status { display: none; }
     #PersonaManagement.mpp-panel #persona_grid_toggle { display: none; }
     #PersonaManagement.mpp-panel #persona_connections_buttons { grid-template-columns: 1fr; }
     .mpp-filter { padding-inline: 8px; }
 }
 
-/* Desktop/laptop presentation. Coarse-pointer tablets keep the native drawer layout. */
-@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+/* Shared PC, laptop and tablet layout. Short touch screens retain the phone layout.
+   Keep this condition in sync with DESKTOP_LAYOUT_QUERY in index.js. */
+@media (min-width: 768px) and (min-height: 541px), (min-width: 768px) and (pointer: fine) {
+    /* ST can transform <html> on tablets, making percentage offsets resolve
+       against its collapsed height instead of the visible screen. */
+    .mpp-page-dimmer { width: 100dvw; height: 100dvh; }
     .mpp-library-toolbar {
         grid-template-columns: minmax(220px, 1fr) auto;
     }
 
-    #PersonaManagement.mpp-panel {
+    #PersonaManagement.mpp-panel#PersonaManagement {
         --mpp-panel-height: min(760px, calc(100dvh - 96px));
 
         position: fixed !important;
         z-index: 11999 !important;
-        top: 50% !important;
+        top: 50dvh !important;
         right: auto !important;
         bottom: auto !important;
-        left: 50% !important;
+        left: 50dvw !important;
         width: min(var(--sheldWidth), calc(100dvw - 64px)) !important;
-        min-width: min(760px, calc(100dvw - 64px));
+        min-width: min(760px, calc(100dvw - 64px)) !important;
         max-width: calc(100dvw - 64px) !important;
         margin: 0 !important;
         border-radius: 24px !important;
@@ -2074,11 +3065,11 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
         transform-origin: center;
     }
 
-    #PersonaManagement.mpp-panel[data-mpp-window-mode='tall'] {
+    #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-window-mode='tall'] {
         --mpp-panel-height: calc(100dvh - 28px);
     }
 
-    #PersonaManagement.mpp-panel.openDrawer {
+    #PersonaManagement.mpp-panel#PersonaManagement.openDrawer {
         transform: translate(-50%, -50%) scale(1);
     }
 
@@ -2172,7 +3163,7 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
         letter-spacing: -0.025em;
     }
 
-    .mpp-spotlight-copy > span {
+    .mpp-spotlight-copy > .mpp-spotlight-status {
         display: inline-flex;
         width: max-content;
         max-width: 100%;
@@ -2189,7 +3180,7 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
         background: color-mix(in srgb, var(--mpp-accent) 10%, transparent);
     }
 
-    .mpp-spotlight-copy > span::before {
+    .mpp-spotlight-copy > .mpp-spotlight-status::before {
         content: '';
         flex: 0 0 6px;
         width: 6px;
@@ -2198,7 +3189,7 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
         background: currentColor;
     }
 
-    #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-spotlight-copy > span {
+    #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] .mpp-spotlight-copy > .mpp-spotlight-status {
         color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text)) !important;
     }
     #PersonaManagement.mpp-panel :is(.mpp-spotlight-visual-crop-button, .mpp-spotlight-crop-button) {
@@ -2222,6 +3213,53 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
     #PersonaManagement.mpp-panel .mpp-persona-card:hover {
         transform: none;
     }
+    #PersonaManagement.mpp-panel :is(.mpp-button, .mpp-card-action, .mpp-native-actions .menu_button):hover { transform: none; }
+
+    /* Fingers need a bigger crop handle than mice do. */
+    .mpp-visual-crop-handle {
+        right: -12px;
+        bottom: -12px;
+        width: 24px;
+        height: 24px;
+    }
+
+    .mpp-visual-crop-handle::after {
+        content: '';
+        position: absolute;
+        inset: -8px;
+    }
+}
+
+/* Rotated phones need natural-height content too; desktop's split scroll areas
+   leave no room for the library when the viewport is only a few hundred pixels tall. */
+@media (min-width: 563px) and (max-height: 540px) and (pointer: coarse) {
+    #PersonaManagement.mpp-panel .mpp-window-mode-button { display: none; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed:not(.mpp-creating):not(.mpp-cleaning) > .flex-container { overflow-y: auto; overscroll-behavior-y: contain; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed .mpp-main { flex: 0 0 auto; overflow: visible; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed .mpp-library-column { height: auto; overflow: visible !important; }
+    #PersonaManagement.mpp-panel.mpp-editor-collapsed #user_avatar_block { flex: 0 0 auto; overflow: visible; }
+    #PersonaManagement.mpp-panel .mpp-library-toolbar #persona_sort_order { max-width: none !important; width: 190px !important; }
+    .mpp-creator-body { overflow-y: auto; align-items: start; grid-template-columns: 190px minmax(0, 1fr); }
+    .mpp-creator-left { min-height: min-content; grid-template-rows: 190px auto auto; overflow: visible; }
+    .mpp-creator-linked-title { overflow-wrap: anywhere; }
+    #PersonaManagement.mpp-panel .mpp-creator-linked-list { width: 100%; grid-template-columns: repeat(auto-fill, 44px); }
+    .mpp-creator-right { display: flex; flex-direction: column; overflow: visible; }
+    .mpp-creator-right > * { flex: 0 0 auto; }
+    .mpp-creator-identity { flex-wrap: wrap; }
+    #PersonaManagement.mpp-panel .mpp-creator-description-input { min-height: 180px; }
+    #PersonaManagement.mpp-panel .mpp-creator-notes textarea { min-height: 100px; }
+    .mpp-creator.is-description-expanded .mpp-creator-description { position: static; }
+    .mpp-creator.is-description-expanded :is(.mpp-creator-tool-stage, .mpp-creator-notes) { visibility: visible; }
+    #PersonaManagement.mpp-panel :is(.mpp-appearance, .mpp-creator, .mpp-cleanup),
+    #PersonaManagement.mpp-panel#PersonaManagement[data-mpp-independent='true'] :is(.mpp-appearance, .mpp-creator, .mpp-cleanup) { background-color: var(--mpp-tint) !important; }
+}
+
+/* Short landscape screens: keep the crop actions inside the modal. */
+@media (max-height: 540px) {
+    .mpp-visual-crop-stage {
+        height: max(140px, calc(100dvh - 220px));
+        min-height: 0;
+    }
 }
 
 @media (max-width: 600px) {
@@ -2233,6 +3271,24 @@ html body .mpp-visual-crop-backdrop[data-mpp-independent='true'] .mpp-button {
         top: var(--topBarBlockSize, 0px) !important;
         margin: 0 auto !important;
         border-radius: 0 0 16px 16px;
+    }
+
+    .mpp-global-persona-launcher {
+        right: 10px;
+        bottom: calc(var(--bottomFormBlockSize, 0px) + 10px);
+    }
+
+    .mpp-global-persona-button {
+        width: 44px;
+        height: 44px;
+    }
+
+    .mpp-global-persona-search { min-height: 44px; font-size: 16px; }
+    .mpp-global-persona-open, .mpp-global-persona-close { min-width: 40px; min-height: 40px; }
+
+    .mpp-global-persona-popover {
+        width: min(340px, calc(100dvw - 20px));
+        max-height: min(500px, calc(100dvh - 140px));
     }
 }
 
