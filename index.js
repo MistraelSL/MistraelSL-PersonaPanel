@@ -220,6 +220,14 @@ const I18N = {
         pageLast: 'Last page',
         perPage: 'per page',
         cleanupTitle: 'Library cleanup',
+        mapTitle: 'Usage map',
+        mapHint: 'Where each persona is bound. Click a persona to open it in the editor.',
+        mapBound: 'Bound',
+        mapOrphans: 'No bindings',
+        mapEmpty: 'No personas to show.',
+        mapLinks: '{count} linked',
+        mapLastUsed: 'used {date}',
+        mapMissing: 'missing',
         cleanupHint: 'Duplicates, empty and dusty personas. Protected personas cannot be selected.',
         cleanupDaysLabel: 'Dust threshold',
         cleanupDays: '{days} days',
@@ -350,6 +358,14 @@ const I18N = {
         pageLast: 'Последняя страница',
         perPage: 'на странице',
         cleanupTitle: 'Уборка библиотеки',
+        mapTitle: 'Карта использования',
+        mapHint: 'Где привязана каждая персона. Клик по персоне открывает её в редакторе.',
+        mapBound: 'С привязками',
+        mapOrphans: 'Без привязок',
+        mapEmpty: 'Нет персон для показа.',
+        mapLinks: 'Привязок: {count}',
+        mapLastUsed: 'была {date}',
+        mapMissing: 'не найден',
         cleanupHint: 'Дубликаты, пустышки и пыльные персоны. Защищённых выбрать нельзя.',
         cleanupDaysLabel: 'Порог пыли',
         cleanupDays: '{days} дней',
@@ -2913,6 +2929,147 @@ function createCleanupWorkspace(panel) {
     return { workspace, open };
 }
 
+/* Usage map: a read-only stage showing where every persona is bound
+   (default, active, current chat, character/group connections). */
+function createUsageMapStage(panel) {
+    const workspace = createElement('section', 'mpp-map');
+    workspace.hidden = true;
+
+    const top = createElement('header', 'mpp-map-top');
+    const backButton = createElement('button', 'mpp-button mpp-map-back');
+    backButton.type = 'button';
+    backButton.append(createElement('i', 'fa-solid fa-arrow-left'), createElement('span', '', t('backToLibrary')));
+    const title = createElement('span', 'mpp-map-title');
+    title.append(createElement('strong', '', t('mapTitle')), createElement('small', '', t('mapHint')));
+    top.append(backButton, title);
+
+    const body = createElement('div', 'mpp-map-body');
+    workspace.append(top, body);
+
+    const statusChip = (className, icon, label) => {
+        const chip = createElement('span', `mpp-map-chip ${className}`);
+        chip.title = label;
+        chip.append(createElement('i', `fa-solid ${icon}`), createElement('span', '', label));
+        return chip;
+    };
+
+    const connectionChip = connection => {
+        const context = globalThis.SillyTavern?.getContext?.() || {};
+        if (connection?.type === 'character') {
+            const character = (context.characters || []).find(item => item && item.avatar === connection.id);
+            const chip = createElement('span', 'mpp-map-chip is-character');
+            const name = character?.name || t('mapMissing');
+            chip.title = `${t('character')}: ${name}`;
+            if (character?.avatar) {
+                const image = createElement('img');
+                image.src = getThumbnailUrl('avatar', character.avatar, false);
+                image.alt = '';
+                image.draggable = false;
+                image.addEventListener('error', () => image.remove(), { once: true });
+                chip.appendChild(image);
+            } else {
+                chip.appendChild(createElement('i', 'fa-solid fa-user-slash'));
+            }
+            chip.appendChild(createElement('span', '', name));
+            return chip;
+        }
+        if (connection?.type === 'group') {
+            const group = (context.groups || []).find(item => item && String(item.id) === String(connection.id));
+            const chip = createElement('span', 'mpp-map-chip is-group');
+            const name = group?.name || t('mapMissing');
+            chip.title = name;
+            chip.append(createElement('i', 'fa-solid fa-users'), createElement('span', '', name));
+            return chip;
+        }
+        return null;
+    };
+
+    const render = () => {
+        body.replaceChildren();
+        const context = globalThis.SillyTavern?.getContext?.() || {};
+        const chatPersona = context.chatMetadata?.persona;
+        const usage = loadPersonaUsage();
+        const infos = Object.keys(power_user.personas || {}).filter(Boolean).map(id => {
+            const connections = power_user.persona_descriptions?.[id]?.connections;
+            return {
+                id,
+                name: power_user.personas?.[id] || id,
+                isDefault: id === power_user.default_persona,
+                isActive: id === user_avatar,
+                isChat: Boolean(chatPersona) && id === chatPersona,
+                connections: Array.isArray(connections) ? connections : [],
+                lastUsed: Number(usage[id]?.lastUsed || 0),
+            };
+        });
+        if (!infos.length) {
+            body.append(createElement('div', 'mpp-map-empty', t('mapEmpty')));
+            return;
+        }
+        const isBound = info => info.isDefault || info.isActive || info.isChat || info.connections.length > 0;
+        const bound = infos.filter(isBound);
+        const orphans = infos.filter(info => !isBound(info));
+        const weight = info => (info.isDefault ? 4 : 0) + (info.isActive ? 2 : 0) + (info.isChat ? 1 : 0);
+        bound.sort((left, right) => (weight(right) - weight(left))
+            || (right.connections.length - left.connections.length)
+            || left.name.localeCompare(right.name));
+        orphans.sort((left, right) => (right.lastUsed - left.lastUsed) || left.name.localeCompare(right.name));
+
+        const buildRow = info => {
+            const row = createElement('button', 'mpp-map-row');
+            row.type = 'button';
+            row.title = t('editPersona');
+            const image = createElement('img');
+            image.src = personaThumbnailUrl(info.id);
+            image.alt = '';
+            image.draggable = false;
+            const copy = createElement('span', 'mpp-map-row-copy');
+            const meta = [];
+            if (info.connections.length) meta.push(t('mapLinks').replace('{count}', String(info.connections.length)));
+            if (info.lastUsed) meta.push(t('mapLastUsed').replace('{date}', new Date(info.lastUsed).toLocaleDateString()));
+            copy.append(createElement('strong', '', info.name), createElement('small', '', meta.join(' • ') || ' '));
+            const chips = createElement('span', 'mpp-map-chips');
+            if (info.isDefault) chips.appendChild(statusChip('is-default', 'fa-crown', t('default')));
+            if (info.isActive) chips.appendChild(statusChip('is-active', 'fa-circle-check', t('active')));
+            if (info.isChat) chips.appendChild(statusChip('is-chat', 'fa-comment', t('chat')));
+            info.connections.map(connectionChip).filter(Boolean).forEach(chip => chips.appendChild(chip));
+            row.append(image, copy, chips);
+            row.addEventListener('click', async () => {
+                close();
+                await panel.mppOpenPersonaEditor?.(info.id, personaImageUrl(info.id));
+            });
+            return row;
+        };
+
+        const buildGroup = (label, list) => {
+            const group = createElement('section', 'mpp-map-group');
+            const head = createElement('div', 'mpp-map-group-head');
+            head.append(createElement('strong', '', label), createElement('small', '', String(list.length)));
+            const rows = createElement('div', 'mpp-map-rows');
+            list.forEach(info => rows.appendChild(buildRow(info)));
+            group.append(head, rows);
+            return group;
+        };
+
+        if (bound.length) body.appendChild(buildGroup(t('mapBound'), bound));
+        if (orphans.length) body.appendChild(buildGroup(t('mapOrphans'), orphans));
+    };
+
+    const open = () => {
+        if (panel.classList.contains('mpp-creating')) panel.mppClosePersonaEditor?.();
+        panel.mppCloseCleanup?.();
+        render();
+        panel.classList.add('mpp-mapping');
+        workspace.hidden = false;
+    };
+    const close = () => {
+        workspace.hidden = true;
+        panel.classList.remove('mpp-mapping');
+    };
+    backButton.addEventListener('click', close);
+    panel.mppCloseMap = close;
+    return { workspace, open, close };
+}
+
 function createCardAction(icon, label, className, handler) {
     const button = createElement('button', `mpp-card-action ${className}`);
     button.type = 'button';
@@ -3983,9 +4140,10 @@ function enhancePanel(panel) {
     libraryTitle.append(document.createTextNode(': '), personaCounter);
     libraryCopy.appendChild(libraryTitle);
     const densityControls = createDensityControls(avatarBlock);
+    const mapOpenButton = createIconButton('fa-map', t('mapTitle'), 'mpp-map-open');
     const cleanupOpenButton = createIconButton('fa-broom', t('cleanupTitle'), 'mpp-cleanup-open');
     const libraryActions = createElement('span', 'mpp-library-actions');
-    libraryActions.append(cleanupOpenButton, densityControls);
+    libraryActions.append(mapOpenButton, cleanupOpenButton, densityControls);
     libraryHeader.append(libraryCopy, libraryActions);
     leftColumn.prepend(libraryHeader);
     const { bar: filters, apply: applyFilter, renderTags: renderTagFilters, setTagFilter } = createFilterBar(avatarBlock);
@@ -4076,6 +4234,9 @@ function enhancePanel(panel) {
     const cleanupStage = createCleanupWorkspace(panel);
     shell.appendChild(cleanupStage.workspace);
     cleanupOpenButton.addEventListener('click', () => cleanupStage.open());
+    const mapStage = createUsageMapStage(panel);
+    shell.appendChild(mapStage.workspace);
+    mapOpenButton.addEventListener('click', () => mapStage.open());
     const refreshRenderedLibrary = () => {
         decorateCards(avatarBlock);
         applyFilter();

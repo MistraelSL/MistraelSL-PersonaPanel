@@ -1067,6 +1067,158 @@
     display: none !important;
 }
 
+/* Usage map stage: same replacement pattern as the cleanup workspace. */
+#PersonaManagement.mpp-panel.mpp-mapping :is(.mpp-spotlight, .mpp-main) {
+    display: none !important;
+}
+
+.mpp-map[hidden] { display: none !important; }
+
+.mpp-map {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 9px;
+    padding: 10px;
+    overflow: hidden;
+    color: var(--mpp-text);
+    border: 1px solid color-mix(in srgb, var(--mpp-accent) 28%, var(--mpp-border));
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--mpp-surface) 92%, transparent);
+}
+
+.mpp-map-top {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.mpp-map-title { display: grid; min-width: 0; gap: 2px; }
+.mpp-map-title strong { font-size: calc(0.94rem + var(--mpp-font-adjust)); }
+.mpp-map-title small { color: var(--mpp-muted); font-size: calc(0.62rem + var(--mpp-font-adjust)); }
+
+#PersonaManagement.mpp-panel .mpp-map-back {
+    width: max-content;
+    min-height: 34px;
+    padding: 6px 14px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+}
+
+.mpp-map-body {
+    display: grid;
+    min-height: 0;
+    flex: 1 1 auto;
+    align-content: start;
+    gap: 10px;
+    padding-right: 2px;
+    overflow-y: auto;
+}
+
+.mpp-map-group {
+    display: grid;
+    gap: 6px;
+    padding: 9px;
+    border: 1px solid color-mix(in srgb, var(--mpp-border) 78%, transparent);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.mpp-map-group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+.mpp-map-group-head strong { font-size: calc(0.82rem + var(--mpp-font-adjust)); }
+.mpp-map-group-head small { color: var(--mpp-muted); }
+
+.mpp-map-rows { display: grid; gap: 5px; }
+
+#PersonaManagement.mpp-panel .mpp-map-row {
+    display: grid;
+    min-width: 0;
+    padding: 6px 8px;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 10px;
+    color: var(--mpp-text);
+    text-align: left;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    cursor: pointer;
+}
+
+#PersonaManagement.mpp-panel .mpp-map-row:hover {
+    border-color: color-mix(in srgb, var(--mpp-accent) 44%, var(--mpp-border));
+    background: color-mix(in srgb, var(--mpp-accent) 9%, rgba(255, 255, 255, 0.045));
+}
+
+.mpp-map-row > img {
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: var(--mpp-surface);
+}
+
+.mpp-map-row-copy { display: grid; min-width: 0; gap: 1px; }
+.mpp-map-row-copy strong,
+.mpp-map-row-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mpp-map-row-copy small { color: var(--mpp-muted); font-size: calc(0.6rem + var(--mpp-font-adjust)); }
+
+.mpp-map-chips {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    gap: 4px;
+}
+.mpp-map-chips:empty { display: none; }
+
+.mpp-map-chip {
+    display: inline-flex;
+    max-width: 100%;
+    min-height: 22px;
+    padding: 2px 8px 2px 3px;
+    align-items: center;
+    gap: 5px;
+    color: var(--mpp-muted);
+    font-size: calc(0.62rem + var(--mpp-font-adjust));
+    border: 1px solid var(--mpp-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.035);
+}
+.mpp-map-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpp-map-chip > i { flex: 0 0 auto; font-size: 0.85em; opacity: 0.75; }
+.mpp-map-chip > img {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border-radius: 50%;
+    background: var(--mpp-surface);
+}
+.mpp-map-chip:is(.is-default, .is-active, .is-chat) { padding-left: 8px; }
+.mpp-map-chip.is-default { color: var(--mpp-warning); border-color: color-mix(in srgb, var(--mpp-warning) 45%, var(--mpp-border)); }
+.mpp-map-chip.is-active { color: color-mix(in srgb, var(--mpp-accent) 72%, var(--mpp-text)); border-color: color-mix(in srgb, var(--mpp-accent) 45%, var(--mpp-border)); }
+.mpp-map-chip.is-chat { color: var(--mpp-positive); border-color: color-mix(in srgb, var(--mpp-positive) 40%, var(--mpp-border)); }
+
+.mpp-map-empty {
+    padding: 22px 12px;
+    color: var(--mpp-muted);
+    text-align: center;
+}
+
 .mpp-cleanup[hidden] { display: none !important; }
 
 .mpp-cleanup {
@@ -1301,6 +1453,9 @@
     .mpp-cleanup-row { grid-template-columns: auto 26px minmax(0, 1fr) auto; }
     .mpp-cleanup-protected { display: none; }
     .mpp-cleanup-bar { flex-wrap: wrap; }
+    .mpp-map { padding: 8px; gap: 8px; }
+    .mpp-map-row { grid-template-columns: 30px minmax(0, 1fr); gap: 5px 8px; }
+    .mpp-map-row > img { width: 30px; height: 30px; }
 }
 
 /* Persona creation workspace. It replaces the library without cloning native editor DOM. */
@@ -2686,6 +2841,7 @@
     .mpp-editor-column select, .mpp-editor-column textarea,
     .mpp-creator button, .mpp-creator input, .mpp-creator select, .mpp-creator textarea,
     .mpp-cleanup select, .mpp-cleanup input,
+    .mpp-map-row,
     .mpp-pager-size
 ) {
     color: var(--mpp-text) !important;
