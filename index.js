@@ -1763,6 +1763,15 @@ function createSpotlight(panel, editorButton) {
         modalGeometry = null;
     };
 
+    const positionCropBackdrop = () => {
+        // A transformed ST root also shifts fixed children when the page scrolls.
+        cropModalBackdrop.style.left = '0px';
+        cropModalBackdrop.style.top = '0px';
+        const rect = cropModalBackdrop.getBoundingClientRect();
+        cropModalBackdrop.style.left = `${-rect.left}px`;
+        cropModalBackdrop.style.top = `${-rect.top}px`;
+    };
+
     const openVisualCrop = () => {
         if (!currentAvatarId || !image.src) return;
         setCropPanelOpen(false);
@@ -1776,9 +1785,10 @@ function createSpotlight(panel, editorButton) {
         cropModalBackdrop.dataset.mppTheme = panel.dataset.mppTheme || '';
         cropModalBackdrop.dataset.mppIndependent = 'true';
         cropModalBackdrop.hidden = false;
+        positionCropBackdrop();
         requestAnimationFrame(() => {
             renderModalCrop(currentCrop);
-            cropModalBackdrop.focus();
+            cropModalBackdrop.focus({ preventScroll: true });
         });
     };
 
@@ -1794,7 +1804,9 @@ function createSpotlight(panel, editorButton) {
         savePortraitCrop(currentAvatarId, currentCrop);
         closeVisualCrop(true);
     });
-    ['pointerdown', 'mousedown'].forEach(eventName => {
+    // ST's outside-drawer handler listens to touchstart separately from pointer events.
+    // Keep the source portrait visible while dragging or applying a crop on phones.
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(eventName => {
         cropModalBackdrop.addEventListener(eventName, event => event.stopPropagation());
     });
     cropModalBackdrop.addEventListener('click', event => {
@@ -1850,8 +1862,14 @@ function createSpotlight(panel, editorButton) {
     cropSelection.addEventListener('pointerup', finishCropInteraction);
     cropSelection.addEventListener('pointercancel', finishCropInteraction);
     window.addEventListener('resize', () => {
-        if (!cropModalBackdrop.hidden) renderModalCrop(currentCrop);
+        if (!cropModalBackdrop.hidden) {
+            positionCropBackdrop();
+            renderModalCrop(currentCrop);
+        }
     });
+    window.addEventListener('scroll', () => {
+        if (!cropModalBackdrop.hidden) positionCropBackdrop();
+    }, { passive: true });
 
     image.addEventListener('load', () => applyCrop(currentCrop));
     // First applyCrop runs while the panel is still display:none: the frame measures 0px and
